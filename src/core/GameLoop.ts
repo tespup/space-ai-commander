@@ -59,9 +59,14 @@ function updatePlayerHPBar() {
 
     if (fill) {
         fill.style.width = `${percent}%`;
-        if (percent > 50) fill.style.background = 'linear-gradient(90deg, #00ffaa, #00ff88)';
-        else if (percent > 20) fill.style.background = 'linear-gradient(90deg, #ffff00, #ffcc00)';
-        else fill.style.background = 'linear-gradient(90deg, #ff0033, #ff4455)';
+
+        if (percent > 50) {
+            fill.style.background = 'linear-gradient(90deg, #00ffaa, #00ff88)';
+        } else if (percent > 20) {
+            fill.style.background = 'linear-gradient(90deg, #ffff00, #ffcc00)';
+        } else {
+            fill.style.background = 'linear-gradient(90deg, #ff0033, #ff4455)';
+        }
     }
 
     if (text) {
@@ -72,13 +77,18 @@ function updatePlayerHPBar() {
 function updateLivesDisplay() {
     const lives = getPlayerLives();
     const hudLives = document.getElementById('hud-lives');
-    if (hudLives) hudLives.innerText = lives.toString();
+
+    if (hudLives) {
+        hudLives.innerText = lives.toString();
+    }
 }
 
 export function startGameLoop() {
     const fpsParam = new URLSearchParams(location.search).get('fps');
+
     if (fpsParam) {
         const fps = Number(fpsParam);
+
         if (Number.isFinite(fps) && fps > 0) {
             app.ticker.maxFPS = fps;
         }
@@ -94,20 +104,29 @@ export function startGameLoop() {
         const bg = document.getElementById('menu-bg');
 
         if (levelState === 'MENU') {
-            if (bg && !bg.classList.contains('active')) bg.classList.add('active');
+            if (bg && !bg.classList.contains('active')) {
+                bg.classList.add('active');
+            }
 
             setStep(frameMS);
             updateParallax();
 
-            if (bg) bg.style.transform = `translate(${currentParallaxX * 20}px, ${currentParallaxY * 20}px)`;
+            if (bg) {
+                bg.style.transform = `translate(${currentParallaxX * 20}px, ${currentParallaxY * 20}px)`;
+            }
 
             const ui = document.getElementById('menu-ui-wrapper');
-            if (ui) ui.style.transform = `translate(${currentParallaxX * -5}px, ${currentParallaxY * -5}px)`;
+
+            if (ui) {
+                ui.style.transform = `translate(${currentParallaxX * -5}px, ${currentParallaxY * -5}px)`;
+            }
 
             app.stage.x = currentParallaxX * 15;
             app.stage.y = currentParallaxY * 15;
         } else {
-            if (bg && bg.classList.contains('active')) bg.classList.remove('active');
+            if (bg && bg.classList.contains('active')) {
+                bg.classList.remove('active');
+            }
 
             app.stage.x = 0;
             app.stage.y = 0;
@@ -118,8 +137,10 @@ export function startGameLoop() {
         enemySpawnSystem(frameMS);
 
         let rest = frameMS;
+
         while (rest > 0.001) {
             const dMS = Math.min(rest, MAX_STEP_MS);
+
             setStep(dMS);
             rest -= dMS;
 
@@ -133,7 +154,11 @@ export function startGameLoop() {
 
             enemyBulletMovementSystem(app);
 
-            if (levelState !== 'MENU' && levelState !== 'POST_LEVEL' && levelState !== 'GAME_OVER') {
+            if (
+                levelState !== 'MENU' &&
+                levelState !== 'POST_LEVEL' &&
+                levelState !== 'GAME_OVER'
+            ) {
                 enemyMovementSystem(dMS, app);
             }
 
@@ -153,7 +178,11 @@ export function startGameLoop() {
         enemyRenderSystem();
         updateVFX();
 
-        if (levelState === 'PLAYING' || levelState === 'WAITING' || levelState === 'FIREWORKS') {
+        if (
+            levelState === 'PLAYING' ||
+            levelState === 'WAITING' ||
+            levelState === 'FIREWORKS'
+        ) {
             updatePlayerHPBar();
             updateLivesDisplay();
         }
