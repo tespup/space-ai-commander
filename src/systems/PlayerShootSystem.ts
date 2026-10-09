@@ -204,7 +204,7 @@ export function playerShootSystem(app: PIXI.Application) {
         Position.x[bullet] = px + offsetX;
         Position.y[bullet] = py + offsetY;
         Velocity.x[bullet] = 0;
-        Velocity.y[bullet] = -10;
+        Velocity.y[bullet] = -20;
         spawnMuzzleFlash(px + offsetX, py + offsetY - 10);
         bulletTypeMap.set(bullet, isMain ? 0 : 1);
         const tex = isMain ? cachedMainTex : cachedPierceTex;

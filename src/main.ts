@@ -82,7 +82,7 @@ async function bootstrap() {
         addComponent(world, player, Health);
 
         Attributes.credits[player] = 0;
-        Attributes.speed[player] = 0.15;
+        Attributes.speed[player] = 0.5;
         Attributes.armor[player] = 0;
         Attributes.weapons[player] = 0;
         Health.max[player] = 150;
