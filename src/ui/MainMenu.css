@@ -1,0 +1,21 @@
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  width: 250px;
+}
+
+.menu-buttons button {
+  padding: 15px;
+  background: transparent;
+  border: 2px solid #00f2ff;
+  color: #00f2ff;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.menu-buttons button:hover {
+  background: rgba(0, 242, 255, 0.1);
+  box-shadow: 0 0 10px #00f2ff;
+}

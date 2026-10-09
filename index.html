@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Space AI Commander</title>
+<base target="_blank">
+</head>
+<body>
+<div id="app-wrapper">
+<div id="menu-bg"></div>
+<div id="app"></div>
+<div id="loader-screen" class="ui-screen">
+<div class="logo">INITIALIZING</div>
+<div class="loader-container"><div id="progress-bar"></div></div>
+<div id="loader-status">CONNECTING...</div>
+</div>
+<div id="main-menu" class="ui-screen hidden">
+<div id="scanline"></div>
+<div id="menu-ui-wrapper">
+<h1 class="logo menu-logo">SPACE AI</h1>
+<div class="menu-buttons">
+<button id="btn-new-game">НОВАЯ ИГРА</button>
+<button id="btn-start">ПРОДОЛЖИТЬ</button>
+<button id="btn-load-menu">ЗАГРУЗИТЬ</button>
+<button id="btn-settings">МЕНЮ</button>
+<button id="btn-exit">ВЫХОД</button>
+</div>
+</div>
+</div>
+<div id="settings-screen" class="ui-screen hidden">
+<h2 class="logo" style="margin-bottom: 30px;">МЕНЮ</h2>
+<div class="settings-container">
+<div class="settings-item">
+<label>ГРОМКОСТЬ МУЗЫКИ</label>
+<input type="range" id="vol-music" min="0" max="1" step="0.1" value="1">
+</div>
+<div class="settings-item">
+<label>ГРОМКОСТЬ ЗВУКОВ</label>
+<input type="range" id="vol-sfx" min="0" max="1" step="0.1" value="1">
+</div>
+<button id="btn-settings-back" style="margin-top: 30px; width: 100%;">НАЗАД</button>
+</div>
+</div>
+<div id="load-screen" class="ui-screen hidden">
+<button id="btn-load-back" style="position: absolute; top: 20px; left: 20px; width: 45px; height: 45px; padding: 0; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 20px; z-index: 10;">⬅</button>
+<h2 class="logo" style="margin-bottom: 20px; margin-top: 20px;">СОХРАНЕНИЯ</h2>
+<div id="save-list" class="cyber-list"></div>
+</div>
+<div id="exit-confirm-screen" class="ui-screen hidden" style="z-index: 400; background: rgba(0,0,0,0.9);">
+<h2 class="logo" style="color: #ff0033; text-shadow: 0 0 15px #ff0033; margin-bottom: 30px;">ВЫЙТИ ИЗ ИГРЫ?</h2>
+<div class="menu-buttons" style="flex-direction: row; justify-content: center;">
+<button id="btn-exit-yes" style="border-color: #ff0033; color: #ff0033; width: 120px;">ДА</button>
+<button id="btn-exit-no" style="border-color: #00ffaa; color: #00ffaa; width: 120px;">НЕТ</button>
+</div>
+</div>
+<div id="game-hud" class="hidden">
+<!-- Кнопка паузы (центрированная иконка) -->
+<button id="btn-pause-menu" style="position: absolute; top: 15px; left: 15px; width: 45px; height: 45px; padding: 0; border-radius: 50%; display: grid; place-items: center; font-size: 18px; line-height: 1; z-index: 130; pointer-events: auto; background: rgba(0,10,20,0.85); border: 2px solid var(--neon); color: var(--neon); box-shadow: 0 0 10px rgba(0,242,255,0.3);">⏸</button>
+<!-- Улучшенный дизайн кредитов -->
+<div id="in-game-score" class="hud-credits-panel">
+КРЕДИТЫ: <span id="hud-score">0</span>
+</div>
+<!-- Жизни в HUD -->
+<div id="in-game-lives" style="position: absolute; top: 15px; right: 15px; font-size: 1.2rem; font-weight: bold; pointer-events: none; text-shadow: 0 0 10px #ff3366; z-index: 120;">
+❤️ <span id="hud-lives">5</span>
+</div>
+<!-- Улучшенная полоска HP -->
+<div id="hp-bar-container" class="hud-hp-bar">
+<div id="hp-bar-fill"></div>
+<div id="hp-bar-text">150 / 150</div>
+</div>
+<div class="abilities-container" style="bottom: 40px;">
+<div class="ab-col ab-col-left">
+<!-- Кнопка Таран (самая верхняя в левой колонке) -->
+<button id="btn-ab-ram" class="ab-btn ab-type-attack">
+<span class="ab-icon">
+<svg viewBox="0 0 40 40" width="26" height="26">
+<path d="M20 4 L28 16 L24 16 L24 36 L16 36 L16 16 L12 16 Z" fill="#ff5500"/>
+<path d="M14 8 L20 2 L26 8" fill="none" stroke="#ffaa00" stroke-width="2"/>
+</svg>
+</span>
+<span class="ab-label">ТАРАН</span>
+<span class="ab-cost" id="ab-cost-ram">25</span>
+<span class="ab-timer" id="ab-timer-ram"></span>
+<span id="ab-cnt-ram" class="ab-badge">0</span>
+</button>
+<button id="btn-ab-armor" class="ab-btn ab-type-defense">
+<span class="ab-icon">
+<svg viewBox="0 0 40 40" width="26" height="26">
+<rect x="16" y="6" width="8" height="28" rx="2" fill="#00ff88"/>
+<rect x="6" y="16" width="28" height="8" rx="2" fill="#00ff88"/>
+</svg>
+</span>
+<span class="ab-label">ЛЕЧЕНИЕ</span>
+<span class="ab-cost" id="ab-cost-armor">30</span>
+<span class="ab-timer" id="ab-timer-armor"></span>
+<span id="ab-cnt-armor" class="ab-badge">0</span>
+</button>
+<button id="btn-ab-shield" class="ab-btn ab-type-defense">
+<span class="ab-icon">
+<svg viewBox="0 0 40 40" width="26" height="26">
+<path d="M20 4 L34 10 L34 22 C34 30 28 36 20 38 C12 36 6 30 6 22 L6 10 Z" fill="none" stroke="#00ccff" stroke-width="3"/>
+<circle cx="20" cy="20" r="5" fill="#00ccff" opacity="0.7"/>
+</svg>
+</span>
+<span class="ab-label">ЩИТ</span>
+<span class="ab-cost" id="ab-cost-shield">50</span>
+<span class="ab-timer" id="ab-timer-shield"></span>
+<span id="ab-cnt-shield" class="ab-badge">0</span>
+</button>
+</div>
+<div class="ab-col ab-col-right">
+<button id="btn-ab-pierce" class="ab-btn ab-type-attack">
+<span class="ab-icon">
+<svg viewBox="0 0 40 40" width="26" height="26">
+<ellipse cx="20" cy="22" rx="7" ry="12" fill="none" stroke="#ff8800" stroke-width="2.5"/>
+<path d="M20 6 L24 12 L20 10 L16 12 Z" fill="#ff8800"/>
+<line x1="20" y1="14" x2="20" y2="30" stroke="#ff8800" stroke-width="2"/>
+</svg>
+</span>
+<span class="ab-label">ПРОБОЙ</span>
+<span class="ab-cost" id="ab-cost-pierce">10</span>
+<span class="ab-timer" id="ab-timer-pierce"></span>
+<span id="ab-cnt-pierce" class="ab-badge">0</span>
+</button>
+<button id="btn-ab-rapid" class="ab-btn ab-type-attack">
+<span class="ab-icon">
+<svg viewBox="0 0 40 40" width="26" height="26">
+<path d="M22 4 L12 22 L19 22 L16 36 L28 16 L21 16 Z" fill="#ffdd00"/>
+</svg>
+</span>
+<span class="ab-label">СКОРОСТЬ</span>
+<span class="ab-cost" id="ab-cost-rapid">20</span>
+<span class="ab-timer" id="ab-timer-rapid"></span>
+<span id="ab-cnt-rapid" class="ab-badge">0</span>
+</button>
+<!-- Кнопка Ракеты (самая нижняя в правой колонке) -->
+<button id="btn-ab-rockets" class="ab-btn ab-type-attack">
+<span class="ab-icon">
+<svg viewBox="0 0 40 40" width="26" height="26">
+<path d="M20 4 C22 10 22 18 20 24 C18 18 18 10 20 4Z" fill="#ff4444"/>
+<path d="M16 24 L14 32 L18 28 Z" fill="#ff8800"/>
+<path d="M24 24 L26 32 L22 28 Z" fill="#ff8800"/>
+<circle cx="20" cy="26" r="3" fill="#ffaa00"/>
+</svg>
+</span>
+<span class="ab-label">РАКЕТЫ</span>
+<span class="ab-cost" id="ab-cost-rockets">40</span>
+<span class="ab-timer" id="ab-timer-rockets"></span>
+<span id="ab-cnt-rockets" class="ab-badge">0</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Экран паузы -->
+<div id="pause-screen" class="ui-screen hidden" style="z-index: 350; background: rgba(0,0,0,0.85);">
+<h2 class="logo" style="color: var(--neon); text-shadow: 0 0 15px var(--neon); margin-bottom: 30px;">ПАУЗА</h2>
+<div class="menu-buttons" style="width: 220px;">
+<button id="btn-pause-resume" style="border-color: #00ffaa; color: #00ffaa;">ВЕРНУТЬСЯ В ИГРУ</button>
+<button id="btn-pause-exit" style="border-color: #ff0033; color: #ff0033;">ВЫЙТИ В МЕНЮ</button>
+</div>
+</div>
+<div id="countdown-screen" class="hidden">
+<div id="countdown-text">3</div>
+</div>
+<div id="level-complete-screen" class="ui-screen hidden" style="justify-content: flex-start; padding-top: 40px;">
+<h2 id="level-complete-title" class="logo" style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+<span style="font-size: 0.6em;">УРОВЕНЬ</span>
+<span id="level-complete-num" style="font-size: 1.5em; color: #fff;">1</span>
+<span style="font-size: 0.6em;">ПРОЙДЕН</span>
+</h2>
+<img id="level-complete-img" src="" alt="Level Complete" style="max-width: 80%; max-height: 25vh; border: 2px solid #00f2ff; margin-bottom: 15px; border-radius: 10px;" />
+<div id="level-upgrade-panel" style="opacity: 0; transition: opacity 1s ease; display: flex; flex-direction: column; align-items: center; pointer-events: none; width: 100%;">
+<p style="font-size: 1.2rem; margin-bottom: 10px;">Кредиты: <span id="level-credit-count">0</span></p>
+<div class="upgrade-grid" style="margin-bottom: 25px; display: flex; flex-direction: column; align-items: center; gap: 10px;">
+<div class="upgrade-item" style="width: 250px;"><span id="armor-lvl-text">🛡️ БРОНЯ (+15 HP)</span><button id="lvl-upg-armor">50</button></div>
+<div class="upgrade-item" style="width: 250px;"><span id="weapons-lvl-text">💥 ОРУЖИЕ (+15 Урон)</span><button id="lvl-upg-weapons">50</button></div>
+</div>
+<div id="level-complete-buttons" class="menu-buttons" style="flex-direction: row; justify-content: center; gap: 10px;">
+<button id="btn-level-save" style="border-color: #00ffaa; color: #00ffaa;">SAVE</button>
+<button id="btn-next-level">СЛЕД. УРОВЕНЬ</button>
+<button id="btn-level-exit">В МЕНЮ</button>
+</div>
+<button id="btn-hangar-back" style="display: none; margin-top: 15px; border-color: #00f2ff; color: #00f2ff;">НАЗАД</button>
+</div>
+</div>
+<!-- ЭКРАН ЗВЁЗДНОЙ КАРТЫ -->
+<div id="star-map-screen" class="ui-screen hidden" style="justify-content: flex-start; padding-top: 20px;">
+<div id="star-map-info" style="display: flex; justify-content: space-between; width: 90%; margin-bottom: 10px; color: var(--neon); font-size: 14px; text-shadow: 0 0 5px var(--neon);">
+<span>ЭТАЖ: <span id="map-floor">1</span></span>
+<span>💰 <span id="map-credits">0</span></span>
+<span>❤️ <span id="map-lives">5</span></span>
+<span>HP: <span id="map-hp">150/150</span></span>
+</div>
+<canvas id="star-map-canvas" width="390" height="600" style="border: 1px solid var(--neon); border-radius: 8px; box-shadow: 0 0 15px rgba(0,242,255,0.3);"></canvas>
+<div id="star-map-buttons" style="display: flex; gap: 15px; margin-top: 15px;">
+<button id="btn-map-hangar">АНГАР</button>
+<button id="btn-map-save" style="border-color: #00ffaa; color: #00ffaa;">SAVE</button>
+<button id="btn-map-menu">В МЕНЮ</button>
+</div>
+</div>
+<!-- ОВЕРЛЕЙ ВЫБОРА РЕЖИМА БОЯ -->
+<div id="battle-choice-overlay" class="hidden">
+<div class="battle-choice-box">
+<h2 class="battle-choice-title">ВЫБОР РЕЖИМА</h2>
+<p class="battle-choice-subtitle">Обнаружен противник на ячейке</p>
+<div class="battle-choice-buttons">
+<button id="btn-battle-standard" class="battle-btn battle-btn-standard">
+<span class="battle-btn-icon">⚔️</span>
+<span class="battle-btn-text">СТАНДАРТНЫЙ БОЙ</span>
+<span class="battle-btn-desc">Полный бой 30 сек</span>
+</button>
+<button id="btn-battle-auto" class="battle-btn battle-btn-auto">
+<span class="battle-btn-icon">⚡</span>
+<span class="battle-btn-text">АВТОБОЙ</span>
+<span class="battle-btn-desc">Мгновенный расчёт: 0–3 столкновения</span>
+</button>
+</div>
+</div>
+</div>
+<!-- ОВЕРЛЕЙ РЕЗУЛЬТАТА АВТОБОЯ -->
+<div id="auto-battle-result-overlay" class="hidden">
+<div class="auto-battle-result-box">
+<h2 id="auto-battle-result-title" class="auto-battle-result-title">РЕЗУЛЬТАТ</h2>
+<div id="auto-battle-result-stats" class="auto-battle-result-stats"></div>
+<button id="btn-auto-battle-continue" class="battle-btn battle-btn-continue">ПРОДОЛЖИТЬ</button>
+</div>
+</div>
+<!-- ЭКРАН GAME OVER -->
+<div id="game-over-screen" class="ui-screen hidden" style="background: radial-gradient(circle at center, #1a0000 0%, #000000 100%);">
+<h1 class="logo" style="color: #ff0033; text-shadow: 0 0 20px #ff0033, 0 0 40px #ff0033; font-size: 3rem; margin-bottom: 20px;">GAME OVER</h1>
+<p style="color: #ff6666; font-size: 1.1rem; margin-bottom: 40px; text-align: center;">Все жизни потеряны.<br>Космос поглотил ещё одного пилота.</p>
+<div class="menu-buttons" style="width: 200px;">
+<button id="btn-gameover-menu" style="border-color: #ff0033; color: #ff0033;">В МЕНЮ</button>
+</div>
+</div>
+</div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
