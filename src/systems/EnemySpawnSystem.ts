@@ -105,7 +105,7 @@ export function enemySpawnSystem(deltaMS: number) {
         Enemy.shotsFired[eid] = 0;
         Enemy.shootTimer[eid] = 0;
 
-        const baseSpeed = 3;
+        const baseSpeed = 6;
         Velocity.x[eid] = 0;
         if (moveType === 0) {
             Velocity.y[eid] = baseSpeed;
