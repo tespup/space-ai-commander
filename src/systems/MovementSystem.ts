@@ -7,6 +7,7 @@ import { Player } from '../components/Player';
 import { Abilities } from '../components/Abilities';
 import { app } from '../core/Renderer';
 import { time } from '../core/GameTime';
+import { dampPerFrame, lerpPerFrame } from '../core/TimeUtils';
 
 let ramPhase: 'idle' | 'up' | 'down' = 'idle';
 let ramTime = 0;
@@ -14,7 +15,6 @@ let ramTargetY = 0;
 
 export function movementSystem() {
     const entities = query(world, [Player, Position, Velocity, Abilities]);
-
     for (let i = 0; i < entities.length; i++) {
         const eid = entities[i];
 
@@ -29,7 +29,6 @@ export function movementSystem() {
 
             if (ramPhase === 'up') {
                 ramTime += 0.15 * time.f;
-
                 const zigzagAmplitude = 60;
                 const zigzagFreq = 0.3;
 
@@ -46,9 +45,10 @@ export function movementSystem() {
                 }
             } else if (ramPhase === 'down') {
                 Position.y[eid] += ramSpeed * time.f;
-
-                const returnK = 1 - Math.pow(1 - 0.03, time.f);
-                Position.x[eid] += (app.screen.width / 2 - Position.x[eid]) * returnK;
+                
+                // Плавно возвращаемся к центру по X
+                const centerX = app.screen.width / 2;
+                Position.x[eid] += (centerX - Position.x[eid]) * lerpPerFrame(0.03, time.f);
 
                 if (Position.y[eid] >= ramTargetY) {
                     Position.y[eid] = ramTargetY;
@@ -57,7 +57,6 @@ export function movementSystem() {
                     ramTime = 0;
                 }
             }
-
             continue;
         } else {
             if (ramPhase !== 'idle') {
@@ -66,34 +65,19 @@ export function movementSystem() {
             }
         }
 
+        // Обычное движение
         Position.x[eid] += (Velocity.x[eid] || 0) * time.f;
         Position.y[eid] += (Velocity.y[eid] || 0) * time.f;
-
-        const damp = Math.pow(0.95, time.f);
+        
+        const damp = dampPerFrame(0.95, time.f);
         Velocity.x[eid] = (Velocity.x[eid] || 0) * damp;
         Velocity.y[eid] = (Velocity.y[eid] || 0) * damp;
 
         const margin = 20;
         const topLimit = app.screen.height * 0.4;
-
-        if (Position.x[eid] < margin) {
-            Position.x[eid] = margin;
-            Velocity.x[eid] = 0;
-        }
-
-        if (Position.x[eid] > app.screen.width - margin) {
-            Position.x[eid] = app.screen.width - margin;
-            Velocity.x[eid] = 0;
-        }
-
-        if (Position.y[eid] < topLimit) {
-            Position.y[eid] = topLimit;
-            Velocity.y[eid] = 0;
-        }
-
-        if (Position.y[eid] > app.screen.height - margin) {
-            Position.y[eid] = app.screen.height - margin;
-            Velocity.y[eid] = 0;
-        }
+        if (Position.x[eid] < margin) { Position.x[eid] = margin; Velocity.x[eid] = 0; }
+        if (Position.x[eid] > app.screen.width - margin) { Position.x[eid] = app.screen.width - margin; Velocity.x[eid] = 0; }
+        if (Position.y[eid] < topLimit) { Position.y[eid] = topLimit; Velocity.y[eid] = 0; }
+        if (Position.y[eid] > app.screen.height - margin) { Position.y[eid] = app.screen.height - margin; Velocity.y[eid] = 0; }
     }
 }

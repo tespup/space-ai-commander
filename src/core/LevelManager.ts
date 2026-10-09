@@ -1,4 +1,5 @@
 // ФАЙЛ: src/core/LevelManager.ts
+
 import { showScreen } from '../ui/ScreenManager';
 import { getActiveEnemies, resetBossSpawn, clearAllEnemies } from '../systems/EnemySpawnSystem';
 import { clearAllBullets } from '../systems/PlayerShootSystem';
@@ -11,13 +12,10 @@ import { world } from '../core/world';
 import { Player } from '../components/Player';
 import { Health } from '../components/Health';
 import { playSaluteSound, fadeOutMusicOverTime } from './AssetLoader';
-import { gameScheduler } from './GameTime';
-import { clearDeathGhosts } from '../systems/EnemyRenderSystem';
 
 export let currentLevel = 1;
 export let currentLevelIsBoss = false;
 export let completedLevelCount = 0;
-
 export let playerLives = 5;
 export let bossesDefeated = 0;
 export let currentCombatTier = 0;
@@ -85,6 +83,7 @@ export function setBossesDefeated(val: number) {
         ? Math.max(0, Math.floor(val))
         : 0;
 
+    // Количество убитых боссов всегда синхронизирует боевой tier.
     currentCombatTier = bossesDefeated;
 }
 
@@ -120,9 +119,6 @@ export function triggerPlayerDeath() {
 }
 
 export function resetAfterDeath() {
-    gameScheduler.clear();
-    clearDeathGhosts();
-
     clearAllEnemies();
     clearAllBullets(app);
     clearAllEnemyBullets(app);
@@ -153,14 +149,9 @@ export function setCompletedLevelCount(count: number) {
 }
 
 export function startLevel() {
-    gameScheduler.clear();
-    clearDeathGhosts();
-
     levelState = 'COUNTDOWN';
-
     countdownTimer = 0;
     countdownValue = 3;
-
     levelTimer = 0;
     waitingTimer = 0;
 
@@ -174,7 +165,6 @@ export function startLevel() {
     }
 
     const panel = document.getElementById('level-upgrade-panel');
-
     if (panel) {
         panel.style.opacity = '0';
         panel.style.pointerEvents = 'none';
@@ -193,9 +183,6 @@ export function startLevel() {
 }
 
 export function exitToMenu() {
-    gameScheduler.clear();
-    clearDeathGhosts();
-
     levelState = 'MENU';
 
     const cdScreen = document.getElementById('countdown-screen');
@@ -241,7 +228,6 @@ export function updateLevel(deltaMS: number) {
 
             if (waitingTimer >= 2000) {
                 levelState = 'FIREWORKS';
-
                 fireworksTimer = 0;
                 fireworkSpawnTimer = 0;
 
@@ -269,6 +255,8 @@ export function updateLevel(deltaMS: number) {
             completedLevelCount++;
 
             if (currentLevelIsBoss) {
+                // После убийства босса количество убитых боссов увеличивается,
+                // а вместе с ним автоматически повышается текущий боевой tier.
                 setBossesDefeated(bossesDefeated + 1);
             }
 

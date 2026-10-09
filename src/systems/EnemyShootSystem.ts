@@ -12,35 +12,30 @@ const enemyBulletSprites = new Map<number, PIXI.Sprite>();
 
 export function spawnEnemyBullet(x: number, y: number, app: PIXI.Application, isBoss: boolean) {
     const bullet = addEntity(world);
-
     addComponent(world, bullet, Position);
     addComponent(world, bullet, Velocity);
     addComponent(world, bullet, EnemyBullet);
 
     Position.x[bullet] = x;
     Position.y[bullet] = y;
-
     Velocity.x[bullet] = 0;
-    Velocity.y[bullet] = isBoss ? 3.33 : 5.5;
-
+    
+    Velocity.y[bullet] = isBoss ? 3.33 : 5.5; 
     EnemyBullet.isBoss[bullet] = isBoss ? 1 : 0;
 
     const graphics = new PIXI.Graphics();
-
     if (isBoss) {
-        graphics.rect(-2, -10, 4, 20).fill(0xff0000);
+        graphics.rect(-2, -10, 4, 20).fill(0xff0000); 
         playBossShootSound();
     } else {
         graphics.circle(0, 0, 4).fill(0xffaa00);
         playEnemyShootSound();
     }
-
+    
     const texture = app.renderer.generateTexture(graphics);
     const sprite = new PIXI.Sprite(texture);
-
     sprite.anchor.set(0.5);
     app.stage.addChild(sprite);
-
     enemyBulletSprites.set(bullet, sprite);
     graphics.destroy();
 }
@@ -50,7 +45,6 @@ export function enemyBulletMovementSystem(app: PIXI.Application) {
 
     for (let i = 0; i < bullets.length; i++) {
         const eid = bullets[i];
-
         Position.y[eid] += Velocity.y[eid] * time.f;
 
         if (Position.y[eid] > app.screen.height + 50) {
@@ -66,7 +60,6 @@ export function enemyBulletRenderSystem() {
     for (let i = 0; i < bullets.length; i++) {
         const eid = bullets[i];
         const sprite = enemyBulletSprites.get(eid);
-
         if (sprite) {
             sprite.x = Position.x[eid];
             sprite.y = Position.y[eid];
@@ -76,7 +69,6 @@ export function enemyBulletRenderSystem() {
 
 export function removeEnemyBulletSprite(eid: number, app: PIXI.Application) {
     const sprite = enemyBulletSprites.get(eid);
-
     if (sprite) {
         app.stage.removeChild(sprite);
         sprite.destroy();
@@ -85,10 +77,9 @@ export function removeEnemyBulletSprite(eid: number, app: PIXI.Application) {
 }
 
 export function clearAllEnemyBullets(app: PIXI.Application) {
-    const bullets = query(world, [EnemyBullet, Position]);
-
-    for (const bullet of bullets) {
-        removeEnemyBulletSprite(bullet, app);
-        removeEntity(world, bullet);
-    }
+  const bullets = query(world, [EnemyBullet, Position]);
+  for (const bullet of bullets) {
+    removeEnemyBulletSprite(bullet, app);
+    removeEntity(world, bullet);
+  }
 }
