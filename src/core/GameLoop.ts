@@ -9,14 +9,7 @@ import { playerControlSystem } from '../systems/PlayerControlSystem';
 import { movementSystem } from '../systems/MovementSystem';
 import { starfieldUpdate } from '../systems/StarfieldSystem';
 import { shipUpdate } from '../systems/ShipSystem';
-import {
-  playerShootSystem,
-  bulletMovementSystem,
-  bulletRenderSystem,
-  bulletTrailSystem,
-  rocketMovementSystem,
-  rocketRenderSystem,
-} from '../systems/PlayerShootSystem';
+import { playerShootSystem, bulletMovementSystem, bulletRenderSystem, bulletTrailSystem, rocketMovementSystem, rocketRenderSystem } from '../systems/PlayerShootSystem';
 import { enemyBulletMovementSystem, enemyBulletRenderSystem } from '../systems/EnemyShootSystem';
 import { enemySpawnSystem } from '../systems/EnemySpawnSystem';
 import { enemyMovementSystem } from '../systems/EnemyMovementSystem';
@@ -25,9 +18,8 @@ import { collisionSystem } from '../systems/CollisionSystem';
 import { abilitySystem } from '../systems/AbilitySystem';
 import { updateVFX } from '../systems/VFXSystem';
 import { currentParallaxX, currentParallaxY, updateParallax, resetParallax } from './InputManager';
-import { clampDeltaMS, frameFromDeltaMS } from './TimeUtils';
+import { clampDeltaMS } from './TimeUtils';
 
-// === ЗАДАЧА 8: Пауза ===
 let gamePaused = false;
 export function setGamePaused(val: boolean) { gamePaused = val; }
 export function isGamePaused(): boolean { return gamePaused; }
@@ -60,15 +52,14 @@ function updateLivesDisplay() {
 
 export function startGameLoop() {
   app.ticker.add((ticker) => {
-    // === ЗАДАЧА 8: При паузе не обновляем игровые системы ===
     if (gamePaused) return;
 
-    // === ЕДИНОЕ ПРАВИЛО ВРЕМЕНИ ===
-    // Получаем реальное время кадра в миллисекундах и ограничиваем скачки.
     const rawDeltaMS = ticker.deltaMS;
     const deltaMS = clampDeltaMS(rawDeltaMS);
-    // Коэффициент «кадров при 60 FPS» для скоростей и инерции.
-    const deltaFrames = frameFromDeltaMS(deltaMS);
+    
+    // ИСПРАВЛЕНИЕ: используем ticker.deltaTime (скаляр = 1 при 60 FPS)
+    // Умножаем на 2 для ускорения игры в 2 раза
+    const deltaFrames = ticker.deltaTime * 2;
 
     updateLevel(deltaMS);
 

@@ -63,6 +63,7 @@ export function spawnDeathShake(eid: number, appRef: PIXI.Application) {
   deathGhosts.push({ sprite: ghost, shakeIntensity, framesLeft });
 }
 
+// ИСПРАВЛЕНИЕ: app теперь импортирован глобально
 function updateDeathGhosts(deltaFrames: number) {
   for (let i = deathGhosts.length - 1; i >= 0; i--) {
     const ghost = deathGhosts[i];
