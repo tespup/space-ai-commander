@@ -9,7 +9,14 @@ import { playerControlSystem } from '../systems/PlayerControlSystem';
 import { movementSystem } from '../systems/MovementSystem';
 import { starfieldUpdate } from '../systems/StarfieldSystem';
 import { shipUpdate } from '../systems/ShipSystem';
-import { playerShootSystem, bulletMovementSystem, bulletRenderSystem, bulletTrailSystem, rocketMovementSystem, rocketRenderSystem } from '../systems/PlayerShootSystem';
+import {
+    playerShootSystem,
+    bulletMovementSystem,
+    bulletRenderSystem,
+    bulletTrailSystem,
+    rocketMovementSystem,
+    rocketRenderSystem
+} from '../systems/PlayerShootSystem';
 import { enemyBulletMovementSystem, enemyBulletRenderSystem } from '../systems/EnemyShootSystem';
 import { enemySpawnSystem } from '../systems/EnemySpawnSystem';
 import { enemyMovementSystem } from '../systems/EnemyMovementSystem';
@@ -17,94 +24,138 @@ import { enemyRenderSystem } from '../systems/EnemyRenderSystem';
 import { collisionSystem } from '../systems/CollisionSystem';
 import { abilitySystem } from '../systems/AbilitySystem';
 import { updateVFX } from '../systems/VFXSystem';
-import { currentParallaxX, currentParallaxY, updateParallax, resetParallax } from './InputManager';
-import { clampDeltaMS } from './TimeUtils';
+import {
+    currentParallaxX,
+    currentParallaxY,
+    updateParallax,
+    resetParallax
+} from './InputManager';
+import { setStep, gameScheduler } from './GameTime';
+
+const MAX_FRAME_MS = 100;
+const MAX_STEP_MS = 34;
 
 let gamePaused = false;
-export function setGamePaused(val: boolean) { gamePaused = val; }
-export function isGamePaused(): boolean { return gamePaused; }
+
+export function setGamePaused(val: boolean) {
+    gamePaused = val;
+}
+
+export function isGamePaused(): boolean {
+    return gamePaused;
+}
 
 function updatePlayerHPBar() {
-  const players = query(world, [Player, Health]);
-  if (players.length === 0) return;
-  const p = players[0];
-  const hp = Math.max(0, Health.value[p]);
-  const maxHp = Health.max[p];
-  const percent = Math.min(100, (hp / maxHp) * 100);
-  const fill = document.getElementById('hp-bar-fill');
-  const text = document.getElementById('hp-bar-text');
-  if (fill) {
-    fill.style.width = `${percent}%`;
-    if (percent > 50) fill.style.background = 'linear-gradient(90deg, #00ffaa, #00ff88)';
-    else if (percent > 20) fill.style.background = 'linear-gradient(90deg, #ffff00, #ffcc00)';
-    else fill.style.background = 'linear-gradient(90deg, #ff0033, #ff4455)';
-  }
-  if (text) {
-    text.innerText = `${Math.floor(hp)} / ${Math.floor(maxHp)}`;
-  }
+    const players = query(world, [Player, Health]);
+    if (players.length === 0) return;
+
+    const p = players[0];
+    const hp = Math.max(0, Health.value[p]);
+    const maxHp = Health.max[p];
+    const percent = Math.min(100, (hp / maxHp) * 100);
+
+    const fill = document.getElementById('hp-bar-fill');
+    const text = document.getElementById('hp-bar-text');
+
+    if (fill) {
+        fill.style.width = `${percent}%`;
+        if (percent > 50) fill.style.background = 'linear-gradient(90deg, #00ffaa, #00ff88)';
+        else if (percent > 20) fill.style.background = 'linear-gradient(90deg, #ffff00, #ffcc00)';
+        else fill.style.background = 'linear-gradient(90deg, #ff0033, #ff4455)';
+    }
+
+    if (text) {
+        text.innerText = `${Math.floor(hp)} / ${Math.floor(maxHp)}`;
+    }
 }
 
 function updateLivesDisplay() {
-  const lives = getPlayerLives();
-  const hudLives = document.getElementById('hud-lives');
-  if (hudLives) hudLives.innerText = lives.toString();
+    const lives = getPlayerLives();
+    const hudLives = document.getElementById('hud-lives');
+    if (hudLives) hudLives.innerText = lives.toString();
 }
 
 export function startGameLoop() {
-  app.ticker.add((ticker) => {
-    if (gamePaused) return;
-
-    const rawDeltaMS = ticker.deltaMS;
-    const deltaMS = clampDeltaMS(rawDeltaMS);
-    
-    // ИСПРАВЛЕНИЕ: используем ticker.deltaTime (скаляр = 1 при 60 FPS)
-    // Умножаем на 2 для ускорения игры в 2 раза
-    const deltaFrames = ticker.deltaTime * 2;
-
-    updateLevel(deltaMS);
-
-    const bg = document.getElementById('menu-bg');
-    if (levelState === 'MENU') {
-      if (bg && !bg.classList.contains('active')) bg.classList.add('active');
-      updateParallax(deltaFrames);
-      if (bg) bg.style.transform = `translate(${currentParallaxX * 20}px, ${currentParallaxY * 20}px)`;
-      const ui = document.getElementById('menu-ui-wrapper');
-      if (ui) ui.style.transform = `translate(${currentParallaxX * -5}px, ${currentParallaxY * -5}px)`;
-      app.stage.x = currentParallaxX * 15;
-      app.stage.y = currentParallaxY * 15;
-    } else {
-      if (bg && bg.classList.contains('active')) bg.classList.remove('active');
-      app.stage.x = 0;
-      app.stage.y = 0;
-      resetParallax();
+    const fpsParam = new URLSearchParams(location.search).get('fps');
+    if (fpsParam) {
+        const fps = Number(fpsParam);
+        if (Number.isFinite(fps) && fps > 0) {
+            app.ticker.maxFPS = fps;
+        }
     }
 
-    playerControlSystem(deltaMS, deltaFrames);
-    movementSystem(deltaFrames);
-    starfieldUpdate(deltaFrames);
-    shipUpdate(deltaFrames);
-    playerShootSystem(app, deltaMS, deltaFrames);
-    bulletMovementSystem(app, deltaFrames);
-    bulletRenderSystem();
-    rocketMovementSystem(app, deltaMS, deltaFrames);
-    rocketRenderSystem();
-    bulletTrailSystem(app, deltaMS, deltaFrames);
-    enemyBulletMovementSystem(app, deltaFrames);
-    enemyBulletRenderSystem();
-    enemySpawnSystem(deltaMS);
+    app.ticker.add((ticker) => {
+        if (gamePaused) return;
 
-    if (levelState !== 'MENU' && levelState !== 'POST_LEVEL' && levelState !== 'GAME_OVER') {
-      enemyMovementSystem(deltaMS, deltaFrames, app);
-    }
+        const frameMS = Math.min(ticker.deltaMS, MAX_FRAME_MS);
 
-    enemyRenderSystem(deltaFrames);
-    collisionSystem(app, deltaMS);
-    abilitySystem(deltaMS);
-    updateVFX(deltaFrames);
+        updateLevel(frameMS);
 
-    if (levelState === 'PLAYING' || levelState === 'WAITING' || levelState === 'FIREWORKS') {
-      updatePlayerHPBar();
-      updateLivesDisplay();
-    }
-  });
+        const bg = document.getElementById('menu-bg');
+
+        if (levelState === 'MENU') {
+            if (bg && !bg.classList.contains('active')) bg.classList.add('active');
+
+            setStep(frameMS);
+            updateParallax();
+
+            if (bg) bg.style.transform = `translate(${currentParallaxX * 20}px, ${currentParallaxY * 20}px)`;
+
+            const ui = document.getElementById('menu-ui-wrapper');
+            if (ui) ui.style.transform = `translate(${currentParallaxX * -5}px, ${currentParallaxY * -5}px)`;
+
+            app.stage.x = currentParallaxX * 15;
+            app.stage.y = currentParallaxY * 15;
+        } else {
+            if (bg && bg.classList.contains('active')) bg.classList.remove('active');
+
+            app.stage.x = 0;
+            app.stage.y = 0;
+
+            resetParallax();
+        }
+
+        enemySpawnSystem(frameMS);
+
+        let rest = frameMS;
+        while (rest > 0.001) {
+            const dMS = Math.min(rest, MAX_STEP_MS);
+            setStep(dMS);
+            rest -= dMS;
+
+            playerControlSystem();
+            movementSystem();
+
+            playerShootSystem(app);
+            bulletMovementSystem(app);
+            rocketMovementSystem(app);
+            bulletTrailSystem(app);
+
+            enemyBulletMovementSystem(app);
+
+            if (levelState !== 'MENU' && levelState !== 'POST_LEVEL' && levelState !== 'GAME_OVER') {
+                enemyMovementSystem(dMS, app);
+            }
+
+            collisionSystem(app);
+            abilitySystem(dMS);
+            gameScheduler.update(dMS);
+        }
+
+        setStep(frameMS);
+
+        bulletRenderSystem();
+        rocketRenderSystem();
+        enemyBulletRenderSystem();
+
+        starfieldUpdate();
+        shipUpdate();
+        enemyRenderSystem();
+        updateVFX();
+
+        if (levelState === 'PLAYING' || levelState === 'WAITING' || levelState === 'FIREWORKS') {
+            updatePlayerHPBar();
+            updateLivesDisplay();
+        }
+    });
 }
