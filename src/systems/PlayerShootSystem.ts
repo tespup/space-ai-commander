@@ -230,10 +230,10 @@ export function playerShootSystem(app: PIXI.Application) {
 
     if (firedSide) {
         playPlayerShootDopSound();
-        shootCooldown = Abilities.rapidTimer[playerEid] > 0 ? 167 : 333;
+        shootCooldown = Abilities.rapidTimer[playerEid] > 0 ? 100 : 200;
     } else if (firedMain) {
         playPlayerShootSound();
-        shootCooldown = Abilities.rapidTimer[playerEid] > 0 ? 167 : 333;
+        shootCooldown = Abilities.rapidTimer[playerEid] > 0 ? 100 : 200;
     }
 }
 
