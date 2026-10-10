@@ -35,27 +35,31 @@ export function collisionSystem(app: PIXI.Application) {
     if (players.length === 0) return;
 
     const player = players[0];
+    let isPlayerDead = Health.value[player] <= 0; // ИСПРАВЛЕНИЕ: Флаг смерти игрока
     const px = Position.x[player];
     const py = Position.y[player];
     const isRamActive = Abilities.ramTimer[player] > 0;
 
     // === ПУЛИ ВРАГОВ ПО ИГРОКУ ===
-    for (let i = enemyBullets.length - 1; i >= 0; i--) {
-        const bullet = enemyBullets[i];
-        const bx = Position.x[bullet];
-        const by = Position.y[bullet];
-        const dist = Math.hypot(px - bx, py - by);
-        if (dist < PLAYER_SIZE / 2 + 10) {
-            removeEnemyBulletSprite(bullet, app);
-            removeEntity(world, bullet);
-            if (Abilities.shieldTimer[player] > 0 || isRamActive) continue;
-            const isBossBullet = EnemyBullet.isBoss[bullet] === 1;
-            const bulletDamage = isBossBullet ? 100 : 50 * Math.pow(1.2, currentCombatTier);
-            Health.value[player] -= bulletDamage;
-            spawnHitImpact(px, py);
-            if (Health.value[player] <= 0) {
-                handlePlayerDeath(player, px, py);
-                return;
+    if (!isPlayerDead) {
+        for (let i = enemyBullets.length - 1; i >= 0; i--) {
+            const bullet = enemyBullets[i];
+            const bx = Position.x[bullet];
+            const by = Position.y[bullet];
+            const dist = Math.hypot(px - bx, py - by);
+            if (dist < PLAYER_SIZE / 2 + 10) {
+                removeEnemyBulletSprite(bullet, app);
+                removeEntity(world, bullet);
+                if (Abilities.shieldTimer[player] > 0 || isRamActive) continue;
+                const isBossBullet = EnemyBullet.isBoss[bullet] === 1;
+                const bulletDamage = isBossBullet ? 100 : 50 * Math.pow(1.2, currentCombatTier);
+                Health.value[player] -= bulletDamage;
+                spawnHitImpact(px, py);
+                if (Health.value[player] <= 0) {
+                    isPlayerDead = true;
+                    handlePlayerDeath(player, px, py);
+                    break; // Игрок мертв, выходим из цикла
+                }
             }
         }
     }
@@ -163,7 +167,7 @@ export function collisionSystem(app: PIXI.Application) {
     }
 
     // === ТАРАН — СТОЛКНОВЕНИЕ ИГРОКА С ВРАГАМИ ===
-    if (isRamActive) {
+    if (isRamActive && !isPlayerDead) {
         for (let i = enemies.length - 1; i >= 0; i--) {
             const enemy = enemies[i];
             if (Health.value[enemy] <= 0) continue;
@@ -188,38 +192,41 @@ export function collisionSystem(app: PIXI.Application) {
     }
 
     // === СТОЛКНОВЕНИЕ ИГРОКА С ВРАГАМИ (обычное) ===
-    for (let i = 0; i < enemies.length; i++) {
-        const enemy = enemies[i];
-        if (Health.value[enemy] <= 0) continue;
-        const ex = Position.x[enemy];
-        const ey = Position.y[enemy];
-        const size = Enemy.isBoss[enemy] ? BOSS_SIZE : ENEMY_SIZE;
-        const dist = Math.hypot(px - ex, py - ey);
-        if (dist < PLAYER_SIZE / 2 + size / 2) {
-            shakePlayer(player, 8);
-            shakeEnemy(enemy, 5);
-            if (Abilities.shieldTimer[player] > 0) {
+    if (!isPlayerDead) {
+        for (let i = 0; i < enemies.length; i++) {
+            const enemy = enemies[i];
+            if (Health.value[enemy] <= 0) continue;
+            const ex = Position.x[enemy];
+            const ey = Position.y[enemy];
+            const size = Enemy.isBoss[enemy] ? BOSS_SIZE : ENEMY_SIZE;
+            const dist = Math.hypot(px - ex, py - ey);
+            if (dist < PLAYER_SIZE / 2 + size / 2) {
+                shakePlayer(player, 8);
+                shakeEnemy(enemy, 5);
+                if (Abilities.shieldTimer[player] > 0) {
+                    if (!Enemy.isBoss[enemy]) {
+                        spawnDeathShake(enemy, app);
+                        spawnExplosion(ex, ey);
+                        removeEnemySprite(enemy, app);
+                        removeEntity(world, enemy);
+                        onEnemyDestroyed();
+                    }
+                    continue;
+                }
+                const collisionDamage = 100 + currentCombatTier * 10;
+                Health.value[player] -= collisionDamage;
+                spawnExplosion(ex, ey);
                 if (!Enemy.isBoss[enemy]) {
                     spawnDeathShake(enemy, app);
-                    spawnExplosion(ex, ey);
                     removeEnemySprite(enemy, app);
                     removeEntity(world, enemy);
                     onEnemyDestroyed();
                 }
-                continue;
-            }
-            const collisionDamage = 100 + currentCombatTier * 10;
-            Health.value[player] -= collisionDamage;
-            spawnExplosion(ex, ey);
-            if (!Enemy.isBoss[enemy]) {
-                spawnDeathShake(enemy, app);
-                removeEnemySprite(enemy, app);
-                removeEntity(world, enemy);
-                onEnemyDestroyed();
-            }
-            if (Health.value[player] <= 0) {
-                handlePlayerDeath(player, px, py);
-                return;
+                if (Health.value[player] <= 0) {
+                    isPlayerDead = true;
+                    handlePlayerDeath(player, px, py);
+                    break; // Игрок мертв, выходим из цикла
+                }
             }
         }
     }

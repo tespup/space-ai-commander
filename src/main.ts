@@ -62,16 +62,12 @@ async function bootstrap() {
         Telegram.WebApp.ready();
         Telegram.WebApp.expand();
         
-        // === ИСТИННЫЙ ПОЛНОЭКРАННЫЙ РЕЖИМ TELEGRAM ===
         try {
-            if (Telegram.WebApp.requestFullscreen) {
-                Telegram.WebApp.requestFullscreen();
-            }
             if (Telegram.WebApp.disableVerticalSwipes) {
                 Telegram.WebApp.disableVerticalSwipes();
             }
         } catch (e) {
-            console.warn('Fullscreen API not supported in this Telegram version', e);
+            console.warn('Telegram API error:', e);
         }
     }
 
@@ -94,7 +90,7 @@ async function bootstrap() {
         addComponent(world, player, Health);
 
         Attributes.credits[player] = 0;
-        Attributes.speed[player] = 0.35; // Увеличена базовая скорость корабля
+        Attributes.speed[player] = 0.5;
         Attributes.armor[player] = 0;
         Attributes.weapons[player] = 0;
         Health.max[player] = 150;
@@ -142,6 +138,15 @@ async function bootstrap() {
         showScreen('main-menu');
     }
 
+    // ИСПРАВЛЕНИЕ: Функция запроса полного экрана. Вызывается ТОЛЬКО по клику пользователя.
+    const requestFS = () => {
+        if (typeof Telegram !== 'undefined' && Telegram.WebApp && Telegram.WebApp.requestFullscreen) {
+            try {
+                Telegram.WebApp.requestFullscreen();
+            } catch (e) {}
+        }
+    };
+
     document.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
         const button = target.tagName === 'BUTTON'
@@ -162,15 +167,18 @@ async function bootstrap() {
     };
 
     bind('btn-new-game', () => {
+        requestFS();
         window.dispatchEvent(new Event('ship-select-opened'));
         showScreen('ship-select-screen');
     });
 
     bind('btn-start', () => {
+        requestFS();
         handleContinueGame();
     });
 
     bind('btn-next-level', () => {
+        requestFS();
         setBossLevel(false);
         startLevel();
     });
@@ -179,6 +187,7 @@ async function bootstrap() {
     bind('btn-level-save', handleSaveGame);
 
     bind('btn-load-menu', () => {
+        requestFS();
         setSelectedSaveId(null);
         loadSavesList();
         showScreen('load-screen');
@@ -209,6 +218,7 @@ async function bootstrap() {
     });
 
     bind('btn-map-hangar', () => {
+        requestFS();
         showHangarFromMap();
     });
 
@@ -283,6 +293,7 @@ async function bootstrap() {
     bind('btn-ab-rockets', () => useAbility('rockets'));
 
     bind('btn-battle-standard', () => {
+        requestFS();
         startStandardBattle();
     });
 

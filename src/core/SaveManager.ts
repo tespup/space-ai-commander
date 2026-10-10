@@ -22,6 +22,7 @@ import {
 import { updateHangarUI } from '../ui/HangarManager';
 import { getMapData, loadStarMap } from '../ui/StarMapManager';
 import { getNodeFloor } from './StarMapGenerator';
+import { showToast } from '../ui/ScreenManager';
 
 export let selectedSaveId: string | null = null;
 
@@ -30,7 +31,6 @@ export function setSelectedSaveId(id: string | null) {
 }
 
 function getSaveFloorAndProgress(save: any): { floor: number; progress: number } {
-    // Сначала пытаемся взять этаж из актуального текущего узла карты.
     if (save.mapData && Array.isArray(save.mapData.nodes)) {
         const currentNode =
             save.mapData.nodes.find((n: any) => n.state === 'current') ||
@@ -46,7 +46,6 @@ function getSaveFloorAndProgress(save: any): { floor: number; progress: number }
         }
     }
 
-    // Если карта не доступна, используем сохранённый этаж.
     if (typeof save.floor === 'number') {
         const fallbackRowInFloor = Math.max(0, Math.min(4, ((save.level || 1) - 1) % 5));
         const progress = ((fallbackRowInFloor + 1) / 5) * 100;
@@ -57,7 +56,6 @@ function getSaveFloorAndProgress(save: any): { floor: number; progress: number }
         };
     }
 
-    // Последний резервный вариант: количество убитых боссов + 1.
     const floor = (save.bossesDefeated || 0) + 1;
     const fallbackRowInFloor = Math.max(0, Math.min(4, ((save.level || 1) - 1) % 5));
     const progress = ((fallbackRowInFloor + 1) / 5) * 100;
@@ -201,7 +199,8 @@ export function handleSaveGame() {
 
     localStorage.setItem('space_ai_saves', JSON.stringify(saves));
 
-    alert('ПРОГРЕСС УСПЕШНО СОХРАНЕН!');
+    // ИСПРАВЛЕНИЕ: Используем кастомный Toast вместо alert, чтобы не ломать звук
+    showToast('ПРОГРЕСС УСПЕШНО СОХРАНЕН!');
 }
 
 export function loadSaveData(save: any) {
@@ -261,7 +260,7 @@ export function handleContinueGame() {
     let saves: any[] = savesStr ? JSON.parse(savesStr) : [];
 
     if (saves.length === 0) {
-        alert('НЕТ СОХРАНЕНИЙ ДЛЯ ПРОДОЛЖЕНИЯ!');
+        showToast('НЕТ СОХРАНЕНИЙ ДЛЯ ПРОДОЛЖЕНИЯ!', true);
         return;
     }
 
@@ -279,21 +278,95 @@ export function handleContinueGame() {
     }
 }
 
+// ИСПРАВЛЕНИЕ: Кастомное окно подтверждения вместо нативного confirm
+function customConfirm(message: string, onConfirm: () => void) {
+    const overlay = document.createElement('div');
+    overlay.style.position = 'absolute';
+    overlay.style.inset = '0';
+    overlay.style.background = 'rgba(0,0,0,0.8)';
+    overlay.style.zIndex = '2000';
+    overlay.style.display = 'flex';
+    overlay.style.flexDirection = 'column';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+
+    const box = document.createElement('div');
+    box.style.background = 'rgba(0, 10, 20, 0.95)';
+    box.style.border = '2px solid #ff0033';
+    box.style.padding = '30px';
+    box.style.borderRadius = '10px';
+    box.style.textAlign = 'center';
+    box.style.boxShadow = '0 0 20px rgba(255, 0, 51, 0.4)';
+
+    const text = document.createElement('p');
+    text.innerText = message;
+    text.style.color = '#ff0033';
+    text.style.fontFamily = '"Courier New", monospace';
+    text.style.fontSize = '1.2rem';
+    text.style.fontWeight = 'bold';
+    text.style.marginBottom = '20px';
+    text.style.textShadow = '0 0 10px #ff0033';
+
+    const btnContainer = document.createElement('div');
+    btnContainer.style.display = 'flex';
+    btnContainer.style.gap = '20px';
+    btnContainer.style.justifyContent = 'center';
+
+    const btnYes = document.createElement('button');
+    btnYes.innerText = 'ДА';
+    btnYes.style.padding = '10px 30px';
+    btnYes.style.background = 'transparent';
+    btnYes.style.border = '2px solid #ff0033';
+    btnYes.style.color = '#ff0033';
+    btnYes.style.cursor = 'pointer';
+    btnYes.style.fontFamily = '"Courier New", monospace';
+    btnYes.style.fontWeight = 'bold';
+
+    const btnNo = document.createElement('button');
+    btnNo.innerText = 'НЕТ';
+    btnNo.style.padding = '10px 30px';
+    btnNo.style.background = 'transparent';
+    btnNo.style.border = '2px solid #00ffaa';
+    btnNo.style.color = '#00ffaa';
+    btnNo.style.cursor = 'pointer';
+    btnNo.style.fontFamily = '"Courier New", monospace';
+    btnNo.style.fontWeight = 'bold';
+
+    btnYes.onclick = () => {
+        document.body.removeChild(overlay);
+        onConfirm();
+    };
+
+    btnNo.onclick = () => {
+        document.body.removeChild(overlay);
+    };
+
+    btnContainer.appendChild(btnYes);
+    btnContainer.appendChild(btnNo);
+    box.appendChild(text);
+    box.appendChild(btnContainer);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+}
+
 export function handleDeleteSave(silent: boolean = false) {
     if (!selectedSaveId) return;
 
-    if (!silent && !confirm('УДАЛИТЬ ДАННЫЙ СЕКТОР ПАМЯТИ?')) return;
+    const executeDelete = () => {
+        const savesStr = localStorage.getItem('space_ai_saves');
+        let saves: any[] = savesStr ? JSON.parse(savesStr) : [];
+        saves = saves.filter((s: any) => s.id !== selectedSaveId);
+        localStorage.setItem('space_ai_saves', JSON.stringify(saves));
+        selectedSaveId = null;
+        loadSavesList();
+    };
 
-    const savesStr = localStorage.getItem('space_ai_saves');
-    let saves: any[] = savesStr ? JSON.parse(savesStr) : [];
+    if (!silent) {
+        customConfirm('УДАЛИТЬ ДАННЫЙ СЕКТОР ПАМЯТИ?', executeDelete);
+        return;
+    }
 
-    saves = saves.filter((s: any) => s.id !== selectedSaveId);
-
-    localStorage.setItem('space_ai_saves', JSON.stringify(saves));
-
-    selectedSaveId = null;
-
-    loadSavesList();
+    executeDelete();
 }
 
 export function handleNewGame() {

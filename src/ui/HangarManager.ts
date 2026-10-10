@@ -5,11 +5,10 @@ import { query } from 'bitecs';
 import { world } from '../core/world';
 import { Player } from '../components/Player';
 import { bossesDefeated } from '../core/LevelManager';
-import { showScreen } from './ScreenManager';
+import { showScreen, showToast } from './ScreenManager';
 import { levelCompleteImages } from '../core/AssetLoader';
 
 export function getUpgradeCost(): number {
-    // ГЛОБАЛЬНАЯ цена: удваивается после каждого убитого босса НАВСЕГДА
     return 50 * Math.pow(2, bossesDefeated);
 }
 
@@ -97,7 +96,8 @@ export function initHangar(playerEid: number, getCurrentLevelFn: () => number) {
 
             updateHangarUI(playerEid, getCurrentLevelFn());
         } else {
-            alert("НЕДОСТАТОЧНО КРЕДИТОВ!");
+            // ИСПРАВЛЕНИЕ: Используем кастомный Toast вместо alert
+            showToast("НЕДОСТАТОЧНО КРЕДИТОВ!", true);
         }
     };
 
