@@ -183,18 +183,18 @@
 <button id="btn-hangar-back" style="display: none; margin-top: 15px; border-color: #00f2ff; color: #00f2ff;">НАЗАД</button>
 </div>
 </div>
-<div id="star-map-screen" class="ui-screen hidden">
-<canvas id="star-map-canvas" width="390" height="600"></canvas>
-<div id="star-map-buttons">
-<button id="btn-map-hangar">АНГАР</button>
-<button id="btn-map-save" style="border-color: #00ffaa; color: #00ffaa;">SAVE</button>
-<button id="btn-map-menu">В МЕНЮ</button>
-</div>
-<div id="star-map-info">
+<div id="star-map-screen" class="ui-screen hidden" style="justify-content: flex-start;">
+<div id="star-map-info" style="display: flex; justify-content: space-between; width: 90%; margin-bottom: 10px; color: var(--neon); font-size: 14px; text-shadow: 0 0 5px var(--neon);">
 <span>ЭТАЖ: <span id="map-floor">1</span></span>
 <span>💰 <span id="map-credits">0</span></span>
 <span>❤️ <span id="map-lives">5</span></span>
 <span>HP: <span id="map-hp">150/150</span></span>
+</div>
+<canvas id="star-map-canvas" width="390" height="600" style="border: 1px solid var(--neon); border-radius: 8px; box-shadow: 0 0 15px rgba(0,242,255,0.3);"></canvas>
+<div id="star-map-buttons" style="display: flex; gap: 15px; margin-top: 15px;">
+<button id="btn-map-hangar">АНГАР</button>
+<button id="btn-map-save" style="border-color: #00ffaa; color: #00ffaa;">SAVE</button>
+<button id="btn-map-menu">В МЕНЮ</button>
 </div>
 </div>
 <div id="battle-choice-overlay" class="hidden">

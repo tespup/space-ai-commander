@@ -1,5 +1,4 @@
 // ФАЙЛ: src/ui/StarMapManager.ts
-
 import { showScreen } from './ScreenManager';
 import {
     generateStarMap,
@@ -35,11 +34,14 @@ let ctx: CanvasRenderingContext2D | null = null;
 let shipImage: HTMLImageElement | null = null;
 let selectedShipIndex: number = parseInt(localStorage.getItem('space_ai_ship_index') || '0');
 
-const CANVAS_W = 390;
-const CANVAS_H = 600;
+// ИСПРАВЛЕНИЕ: размеры canvas больше не жёсткие, а вычисляются по факту разметки
+let canvasW = 390;
+let canvasH = 600;
+let sizedW = 0;
+let sizedH = 0;
+
 const NODE_RADIUS = 22;
 const CELL_SIZE = 90;
-
 const EXTEND_THRESHOLD = 3;
 
 let cameraX = 0;
@@ -68,12 +70,32 @@ let stars: { x: number; y: number; size: number; speed: number }[] = [];
 let pendingBattleNode: StarNode | null = null;
 let autoBattleGameOverPending = false;
 
+// ИСПРАВЛЕНИЕ: подгон внутреннего разрешения canvas под фактический CSS-размер
+function resizeStarMapCanvas() {
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width < 2 || rect.height < 2) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = Math.floor(rect.width);
+    const h = Math.floor(rect.height);
+    const changed = (w !== sizedW || h !== sizedH);
+    sizedW = w;
+    sizedH = h;
+    canvasW = w;
+    canvasH = h;
+    canvas.width = Math.floor(w * dpr);
+    canvas.height = Math.floor(h * dpr);
+    ctx = canvas.getContext('2d');
+    if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (changed || stars.length === 0) generateStars();
+}
+
 function generateStars() {
     stars = [];
     for (let i = 0; i < 150; i++) {
         stars.push({
-            x: Math.random() * CANVAS_W,
-            y: Math.random() * CANVAS_H,
+            x: Math.random() * canvasW,
+            y: Math.random() * canvasH,
             size: 0.4 + Math.random() * 1.5,
             speed: 0.2 + Math.random() * 0.8,
         });
@@ -100,13 +122,10 @@ function openAllAdjacentNodes(node: StarNode) {
 
 function checkAndExtendMap() {
     if (!mapData || mapData.nodes.length === 0) return;
-
     const currentNode = mapData.nodes.find(n => n.state === 'current');
     if (!currentNode) return;
-
     const maxRow = Math.max(...mapData.nodes.map(n => n.row));
     const rowsAhead = maxRow - currentNode.row;
-
     if (rowsAhead <= EXTEND_THRESHOLD) {
         mapData = extendStarMap(mapData);
         openAllAdjacentNodes(currentNode);
@@ -133,10 +152,8 @@ function updateInfoPanel() {
     const mapCredits = document.getElementById('map-credits');
     const mapHp = document.getElementById('map-hp');
     const mapLives = document.getElementById('map-lives');
-
     const current = mapData.nodes.find(n => n.state === 'current');
     const floor = current ? getNodeFloor(current.row) : 1;
-
     if (mapFloor) mapFloor.innerText = floor.toString();
     if (mapCredits) mapCredits.innerText = info.credits.toString();
     if (mapHp) mapHp.innerText = `${Math.floor(info.hp)}/${Math.floor(info.maxHp)}`;
@@ -158,9 +175,7 @@ export function loadStarMap(savedMap: StarMapData) {
     mapData = savedMap;
     const current = mapData.nodes.find(n => n.state === 'current');
     if (current) openAllAdjacentNodes(current);
-
     checkAndExtendMap();
-
     resetCameraToCurrent();
     showStarMap();
 }
@@ -171,16 +186,13 @@ export function getMapData(): StarMapData | null {
 
 export function completeCurrentNode() {
     if (!mapData) return;
-
     const currentNode = mapData.nodes.find(n => n.state === 'current');
     if (currentNode) {
         markNodeCompleted(mapData, currentNode.id);
         openAllAdjacentNodes(currentNode);
         previousNodeId = null;
     }
-
     checkAndExtendMap();
-
     resetCameraToCurrent();
     showStarMap();
 }
@@ -211,8 +223,8 @@ function resetCameraToCurrent() {
 
 function worldToScreen(wx: number, wy: number): { sx: number; sy: number } {
     return {
-        sx: wx + cameraX + CANVAS_W / 2,
-        sy: wy + cameraY + CANVAS_H / 2,
+        sx: wx + cameraX + canvasW / 2,
+        sy: wy + cameraY + canvasH / 2,
     };
 }
 
@@ -220,12 +232,10 @@ function layoutNodes() {
     if (!mapData) return;
     const nodes = mapData.nodes;
     if (nodes.length === 0) return;
-
     const maxCol = Math.max(...nodes.map(n => n.col)) + 1;
     const maxRow = Math.max(...nodes.map(n => n.row)) + 1;
     const offsetX = CELL_SIZE;
     const offsetY = CELL_SIZE;
-
     nodes.forEach(node => {
         if (node.type === 'boss') {
             node.x = ((maxCol - 1) / 2) * CELL_SIZE + offsetX;
@@ -240,12 +250,12 @@ function drawStarMap() {
     if (!ctx || !mapData) return;
     const context = ctx;
     const data = mapData;
-    const w = CANVAS_W;
-    const h = CANVAS_H;
+    const w = canvasW;
+    const h = canvasH;
 
     context.clearRect(0, 0, w, h);
 
-    const bgGrad = context.createRadialGradient(w / 2, h / 2, 50, w / 2, h / 2, 400);
+    const bgGrad = context.createRadialGradient(w / 2, h / 2, 50, w / 2, h / 2, Math.max(w, h));
     bgGrad.addColorStop(0, '#0a1020');
     bgGrad.addColorStop(1, '#01030a');
     context.fillStyle = bgGrad;
@@ -264,14 +274,12 @@ function drawStarMap() {
     context.shadowColor = '#0ff';
     context.shadowBlur = 6;
     context.beginPath();
-
     data.nodes.forEach(node => {
         const neighbors = [
             data.nodes.find(n => n.row === node.row + 1 && n.col === node.col),
             data.nodes.find(n => n.row === node.row && n.col === node.col - 1),
             data.nodes.find(n => n.row === node.row && n.col === node.col + 1),
         ].filter(Boolean) as StarNode[];
-
         neighbors.forEach(neighbor => {
             const p1 = worldToScreen(node.x, node.y);
             const p2 = worldToScreen(neighbor.x, neighbor.y);
@@ -279,7 +287,6 @@ function drawStarMap() {
             context.lineTo(p2.sx, p2.sy);
         });
     });
-
     context.stroke();
     context.shadowColor = 'transparent';
     context.shadowBlur = 0;
@@ -288,7 +295,6 @@ function drawStarMap() {
 
     data.nodes.forEach(node => {
         const { sx, sy } = worldToScreen(node.x, node.y);
-
         if (
             sx < -NODE_RADIUS ||
             sx > w + NODE_RADIUS ||
@@ -359,7 +365,6 @@ function drawStarMap() {
             drawY = moveAnim.shipY;
         }
         const { sx, sy } = worldToScreen(drawX, drawY);
-
         const cols = 5;
         const rows = 5;
         const frameW = shipImage.width / cols;
@@ -367,7 +372,6 @@ function drawStarMap() {
         const ix = (selectedShipIndex % cols) * frameW;
         const iy = Math.floor(selectedShipIndex / cols) * frameH;
         const size = 30;
-
         context.shadowColor = '#00ff88';
         context.shadowBlur = 10;
         context.drawImage(
@@ -395,7 +399,6 @@ function animateMove(
 ) {
     const duration = 500;
     const start = performance.now();
-
     moveAnim = {
         from,
         to,
@@ -420,7 +423,6 @@ function animateMove(
             requestAnimationFrame(step);
         }
     }
-
     requestAnimationFrame(step);
 }
 
@@ -450,7 +452,6 @@ function resolveAutoBattle() {
     if (!pendingBattleNode) return;
     const node = pendingBattleNode;
     hideBattleChoice();
-
     const tier = getCurrentCombatTier();
     const collisionDamage = 100 + (tier * 10);
     const roll = Math.random();
@@ -459,14 +460,12 @@ function resolveAutoBattle() {
     else if (roll < 0.80) collisions = 1;
     else if (roll < 0.95) collisions = 2;
     else collisions = 3;
-
     const totalDamage = collisions * collisionDamage;
     const players = query(world, [Player]);
     if (players.length === 0) return;
     const p = players[0];
     const playerMaxHp = Health.max[p];
     const survived = playerMaxHp > totalDamage;
-
     if (survived) {
         const enemiesSimulated = 3 + Math.floor(Math.random() * 5);
         const rewardPerEnemy = Math.floor(10 * Math.pow(1.15, tier));
@@ -553,7 +552,6 @@ function showAutoBattleResult(
             </span>
         </div>
     `;
-
     if (won) {
         statsHtml += `
             <div class="stat-row">
@@ -569,7 +567,6 @@ function showAutoBattleResult(
             </div>
         `;
     }
-
     stats.innerHTML = statsHtml;
     overlay.classList.remove('hidden');
 }
@@ -594,25 +591,21 @@ export {
 export function showStarMap() {
     canvas = document.getElementById('star-map-canvas') as HTMLCanvasElement;
     if (!canvas) return;
-
-    canvas.width = CANVAS_W;
-    canvas.height = CANVAS_H;
-    ctx = canvas.getContext('2d')!;
-
+    // ИСПРАВЛЕНИЕ: сначала показываем экран (чтобы canvas получил реальную
+    // CSS-geometry), затем подгоняем внутреннее разрешение под факт
+    showScreen('star-map-screen');
+    resizeStarMapCanvas();
+    ctx = canvas.getContext('2d');
     if (!shipImage) {
         shipImage = new Image();
         shipImage.src = playerImageSrc;
     }
-
     if (stars.length === 0) generateStars();
-
     const bg = document.getElementById('menu-bg');
     if (bg) bg.classList.add('active');
-
     layoutNodes();
     resetCameraToCurrent();
     pulseTime = 0;
-
     if (animFrameId !== null) cancelAnimationFrame(animFrameId);
 
     function animLoop() {
@@ -626,26 +619,20 @@ export function showStarMap() {
         drawStarMap();
         animFrameId = requestAnimationFrame(animLoop);
     }
-
     animFrameId = requestAnimationFrame(animLoop);
-    showScreen('star-map-screen');
 }
 
 // === ВЫНОСИМ ЛОГИКУ КЛИКА В ОТДЕЛЬНУЮ ФУНКЦИЮ ===
 function handleNodeClick(pos: {x: number, y: number}) {
     if (!mapData) return;
-    
-    const worldX = pos.x - cameraX - CANVAS_W / 2;
-    const worldY = pos.y - cameraY - CANVAS_H / 2;
-
+    const worldX = pos.x - cameraX - canvasW / 2;
+    const worldY = pos.y - cameraY - canvasH / 2;
     const clickedNode = mapData.nodes.find(node => {
         const dx = worldX - node.x;
         const dy = worldY - node.y;
         return Math.sqrt(dx * dx + dy * dy) <= NODE_RADIUS + 8;
     });
-
     if (!clickedNode) return;
-
     const current = mapData.nodes.find(n => n.state === 'current');
     if (!current || current.id === clickedNode.id) return;
     if (clickedNode.state === 'locked') return;
@@ -655,11 +642,9 @@ function handleNodeClick(pos: {x: number, y: number}) {
         current.completed = true;
         current.state = 'available';
         clickedNode.state = 'current';
-
         const nodeTier = getNodeFloor(clickedNode.row) - 1;
         const battleTier = Math.max(getBossesDefeated(), nodeTier);
         setCombatTier(battleTier);
-
         animateMove(
             { x: current.x, y: current.y },
             { x: clickedNode.x, y: clickedNode.y },
@@ -679,7 +664,6 @@ function handleNodeClick(pos: {x: number, y: number}) {
         current.completed = true;
         current.state = 'available';
         clickedNode.state = 'current';
-
         animateMove(
             { x: current.x, y: current.y },
             { x: clickedNode.x, y: clickedNode.y },
@@ -698,8 +682,8 @@ export function initStarMapEvents() {
     const getClickPos = (e: MouseEvent | Touch) => {
         const rect = canvas!.getBoundingClientRect();
         return {
-            x: (e.clientX - rect.left) * (CANVAS_W / rect.width),
-            y: (e.clientY - rect.top) * (CANVAS_H / rect.height),
+            x: (e.clientX - rect.left) * (canvasW / rect.width),
+            y: (e.clientY - rect.top) * (canvasH / rect.height),
         };
     };
 
@@ -752,12 +736,10 @@ export function initStarMapEvents() {
         const touch = e.touches[0];
         const dx = touch.clientX - dragStartX;
         const dy = touch.clientY - dragStartY;
-        
         // Если палец сдвинулся больше чем на 5 пикселей, это свайп, а не тап
         if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
             isTap = false;
         }
-
         targetCameraX = dragCamStartX + dx;
         targetCameraY = dragCamStartY + dy;
         cameraX = targetCameraX;
@@ -766,14 +748,12 @@ export function initStarMapEvents() {
 
     canvas.addEventListener('touchend', (e) => {
         isDragging = false;
-        
         // === РУЧНАЯ ОБРАБОТКА ТАПА ДЛЯ МОБИЛЬНЫХ ===
         if (isTap && mapData && canvas) {
             const touch = e.changedTouches[0];
             const pos = getClickPos(touch);
             handleNodeClick(pos);
         }
-
         if (mapData) {
             const cur = mapData.nodes.find(n => n.state === 'current');
             if (cur) {
@@ -785,15 +765,20 @@ export function initStarMapEvents() {
 
     canvas.addEventListener('click', (e) => {
         if (!mapData || !canvas) return;
-
         if (
             Math.abs(cameraX - targetCameraX) > 5 ||
             Math.abs(cameraY - targetCameraY) > 5
         ) {
             return;
         }
-
         const pos = getClickPos(e);
         handleNodeClick(pos);
+    });
+
+    // ИСПРАВЛЕНИЕ: пересчёт размеров canvas при изменении размера окна/viewport
+    window.addEventListener('resize', () => {
+        const screen = document.getElementById('star-map-screen');
+        if (!screen || screen.classList.contains('hidden')) return;
+        resizeStarMapCanvas();
     });
 }
