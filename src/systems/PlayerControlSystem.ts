@@ -61,8 +61,8 @@ export function playerControlSystem() {
     }
 
     timerMs += time.ms;
-    if (timerMs >= 1500) {
-      timerMs -= 1500;
+    if (timerMs >= 800) {
+      timerMs -= 800;
       targetX = Math.random() * app.screen.width;
       const safeZoneHeight = app.screen.height * 0.4;
       targetY = app.screen.height - (Math.random() * safeZoneHeight);

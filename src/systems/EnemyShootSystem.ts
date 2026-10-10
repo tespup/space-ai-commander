@@ -20,7 +20,7 @@ export function spawnEnemyBullet(x: number, y: number, app: PIXI.Application, is
     Position.y[bullet] = y;
     Velocity.x[bullet] = 0;
     
-    Velocity.y[bullet] = isBoss ? 3.33 : 5.5; 
+    Velocity.y[bullet] = isBoss ? 2.33 : 3.5; 
     EnemyBullet.isBoss[bullet] = isBoss ? 1 : 0;
 
     const graphics = new PIXI.Graphics();
