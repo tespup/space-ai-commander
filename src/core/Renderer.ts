@@ -8,19 +8,20 @@ export async function initRenderer() {
   if (!container) return;
 
   await app.init({
-    backgroundAlpha: 0, // Делаем холст прозрачным, чтобы видеть планету позади него
+    backgroundAlpha: 0, 
     resizeTo: container,
-    antialias: true,
+    // ИСПРАВЛЕНИЕ: Ограничение разрешения для оптимизации FPS на смартфонах
+    resolution: Math.min(window.devicePixelRatio || 1, 2), 
+    autoDensity: true,
+    antialias: false, // ИСПРАВЛЕНИЕ: Отключение сглаживания для повышения производительности
   });
 
   app.canvas.style.position = 'absolute';
   app.canvas.style.top = '0';
   app.canvas.style.left = '0';
-  // Слой 1 — над фоном контейнера, но под UI-экранами
   app.canvas.style.zIndex = '1'; 
   
   container.prepend(app.canvas);
 
-  // Принудительный сброс размеров под контейнер
   app.renderer.resize(container.clientWidth, container.clientHeight);
 }

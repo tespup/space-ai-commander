@@ -44,7 +44,8 @@
 </div>
 </div>
 <div id="load-screen" class="ui-screen hidden">
-<button id="btn-load-back" style="position: absolute; top: 20px; left: 20px; width: 45px; height: 45px; padding: 0; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 20px; z-index: 10;">⬅</button>
+<!-- ИСПРАВЛЕНИЕ: Добавлен сдвиг var(--ui-top) для безопасной зоны -->
+<button id="btn-load-back" style="position: absolute; top: calc(20px + var(--ui-top, 0px)); left: 20px; width: 45px; height: 45px; padding: 0; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 20px; z-index: 10;">⬅</button>
 <h2 class="logo" style="margin-bottom: 20px; margin-top: 20px;">СОХРАНЕНИЯ</h2>
 <div id="save-list" class="cyber-list"></div>
 </div>
@@ -56,24 +57,22 @@
 </div>
 </div>
 <div id="game-hud" class="hidden">
-<!-- Кнопка паузы (центрированная иконка) -->
-<button id="btn-pause-menu" style="position: absolute; top: 15px; left: 15px; width: 45px; height: 45px; padding: 0; border-radius: 50%; display: grid; place-items: center; font-size: 18px; line-height: 1; z-index: 130; pointer-events: auto; background: rgba(0,10,20,0.85); border: 2px solid var(--neon); color: var(--neon); box-shadow: 0 0 10px rgba(0,242,255,0.3);">⏸</button>
-<!-- Улучшенный дизайн кредитов -->
+<!-- ИСПРАВЛЕНИЕ: Добавлен сдвиг var(--ui-top) для безопасной зоны -->
+<button id="btn-pause-menu" style="position: absolute; top: calc(15px + var(--ui-top, 0px)); left: 15px; width: 45px; height: 45px; padding: 0; border-radius: 50%; display: grid; place-items: center; font-size: 18px; line-height: 1; z-index: 130; pointer-events: auto; background: rgba(0,10,20,0.85); border: 2px solid var(--neon); color: var(--neon); box-shadow: 0 0 10px rgba(0,242,255,0.3);">⏸</button>
 <div id="in-game-score" class="hud-credits-panel">
 КРЕДИТЫ: <span id="hud-score">0</span>
 </div>
-<!-- Жизни в HUD -->
-<div id="in-game-lives" style="position: absolute; top: 15px; right: 15px; font-size: 1.2rem; font-weight: bold; pointer-events: none; text-shadow: 0 0 10px #ff3366; z-index: 120;">
+<!-- ИСПРАВЛЕНИЕ: Добавлен сдвиг var(--ui-top) для безопасной зоны -->
+<div id="in-game-lives" style="position: absolute; top: calc(15px + var(--ui-top, 0px)); right: 15px; font-size: 1.2rem; font-weight: bold; pointer-events: none; text-shadow: 0 0 10px #ff3366; z-index: 120;">
 ❤️ <span id="hud-lives">5</span>
 </div>
-<!-- Улучшенная полоска HP -->
 <div id="hp-bar-container" class="hud-hp-bar">
 <div id="hp-bar-fill"></div>
 <div id="hp-bar-text">150 / 150</div>
 </div>
-<div class="abilities-container" style="bottom: 40px;">
+<!-- ИСПРАВЛЕНИЕ: Убран жесткий inline bottom, теперь управляется через CSS с учетом var(--ui-bottom) -->
+<div class="abilities-container">
 <div class="ab-col ab-col-left">
-<!-- Кнопка Таран (самая верхняя в левой колонке) -->
 <button id="btn-ab-ram" class="ab-btn ab-type-attack">
 <span class="ab-icon">
 <svg viewBox="0 0 40 40" width="26" height="26">
@@ -136,7 +135,6 @@
 <span class="ab-timer" id="ab-timer-rapid"></span>
 <span id="ab-cnt-rapid" class="ab-badge">0</span>
 </button>
-<!-- Кнопка Ракеты (самая нижняя в правой колонке) -->
 <button id="btn-ab-rockets" class="ab-btn ab-type-attack">
 <span class="ab-icon">
 <svg viewBox="0 0 40 40" width="26" height="26">
@@ -154,7 +152,6 @@
 </div>
 </div>
 </div>
-<!-- Экран паузы -->
 <div id="pause-screen" class="ui-screen hidden" style="z-index: 350; background: rgba(0,0,0,0.85);">
 <h2 class="logo" style="color: var(--neon); text-shadow: 0 0 15px var(--neon); margin-bottom: 30px;">ПАУЗА</h2>
 <div class="menu-buttons" style="width: 220px;">
@@ -165,7 +162,7 @@
 <div id="countdown-screen" class="hidden">
 <div id="countdown-text">3</div>
 </div>
-<div id="level-complete-screen" class="ui-screen hidden" style="justify-content: flex-start; padding-top: 40px;">
+<div id="level-complete-screen" class="ui-screen hidden" style="justify-content: flex-start;">
 <h2 id="level-complete-title" class="logo" style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
 <span style="font-size: 0.6em;">УРОВЕНЬ</span>
 <span id="level-complete-num" style="font-size: 1.5em; color: #fff;">1</span>
@@ -186,8 +183,7 @@
 <button id="btn-hangar-back" style="display: none; margin-top: 15px; border-color: #00f2ff; color: #00f2ff;">НАЗАД</button>
 </div>
 </div>
-<!-- ЭКРАН ЗВЁЗДНОЙ КАРТЫ -->
-<div id="star-map-screen" class="ui-screen hidden" style="justify-content: flex-start; padding-top: 20px;">
+<div id="star-map-screen" class="ui-screen hidden" style="justify-content: flex-start;">
 <div id="star-map-info" style="display: flex; justify-content: space-between; width: 90%; margin-bottom: 10px; color: var(--neon); font-size: 14px; text-shadow: 0 0 5px var(--neon);">
 <span>ЭТАЖ: <span id="map-floor">1</span></span>
 <span>💰 <span id="map-credits">0</span></span>
@@ -201,7 +197,6 @@
 <button id="btn-map-menu">В МЕНЮ</button>
 </div>
 </div>
-<!-- ОВЕРЛЕЙ ВЫБОРА РЕЖИМА БОЯ -->
 <div id="battle-choice-overlay" class="hidden">
 <div class="battle-choice-box">
 <h2 class="battle-choice-title">ВЫБОР РЕЖИМА</h2>
@@ -220,7 +215,6 @@
 </div>
 </div>
 </div>
-<!-- ОВЕРЛЕЙ РЕЗУЛЬТАТА АВТОБОЯ -->
 <div id="auto-battle-result-overlay" class="hidden">
 <div class="auto-battle-result-box">
 <h2 id="auto-battle-result-title" class="auto-battle-result-title">РЕЗУЛЬТАТ</h2>
@@ -228,7 +222,6 @@
 <button id="btn-auto-battle-continue" class="battle-btn battle-btn-continue">ПРОДОЛЖИТЬ</button>
 </div>
 </div>
-<!-- ЭКРАН GAME OVER -->
 <div id="game-over-screen" class="ui-screen hidden" style="background: radial-gradient(circle at center, #1a0000 0%, #000000 100%);">
 <h1 class="logo" style="color: #ff0033; text-shadow: 0 0 20px #ff0033, 0 0 40px #ff0033; font-size: 3rem; margin-bottom: 20px;">GAME OVER</h1>
 <p style="color: #ff6666; font-size: 1.1rem; margin-bottom: 40px; text-align: center;">Все жизни потеряны.<br>Космос поглотил ещё одного пилота.</p>

@@ -58,17 +58,30 @@ import {
 declare const Telegram: any;
 
 async function bootstrap() {
+    // ИСПРАВЛЕНИЕ: Правильная инициализация Telegram API и обработка ресайза
     if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
-        Telegram.WebApp.ready();
-        Telegram.WebApp.expand();
+        const tg = Telegram.WebApp;
+        tg.ready();
+        tg.expand();
         
         try {
-            if (Telegram.WebApp.disableVerticalSwipes) {
-                Telegram.WebApp.disableVerticalSwipes();
-            }
+            if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
         } catch (e) {
             console.warn('Telegram API error:', e);
         }
+
+        const onResize = () => {
+            const container = document.getElementById('app');
+            if (container) {
+                app.renderer.resize(container.clientWidth, container.clientHeight);
+            }
+        };
+
+        tg.onEvent('fullscreenFailed', (e: any) => console.warn('fullscreen failed', e?.error));
+        tg.onEvent('fullscreenChanged', onResize);
+        tg.onEvent('viewportChanged', onResize);
+        tg.onEvent('safeAreaChanged', onResize);
+        tg.onEvent('contentSafeAreaChanged', onResize);
     }
 
     showScreen('loader-screen');
@@ -90,7 +103,7 @@ async function bootstrap() {
         addComponent(world, player, Health);
 
         Attributes.credits[player] = 0;
-        Attributes.speed[player] = 0.5;
+        Attributes.speed[player] = 0.35;
         Attributes.armor[player] = 0;
         Attributes.weapons[player] = 0;
         Health.max[player] = 150;
@@ -140,10 +153,13 @@ async function bootstrap() {
 
     // ИСПРАВЛЕНИЕ: Функция запроса полного экрана. Вызывается ТОЛЬКО по клику пользователя.
     const requestFS = () => {
-        if (typeof Telegram !== 'undefined' && Telegram.WebApp && Telegram.WebApp.requestFullscreen) {
-            try {
-                Telegram.WebApp.requestFullscreen();
-            } catch (e) {}
+        if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
+            const tg = Telegram.WebApp;
+            if (tg.isVersionAtLeast && tg.isVersionAtLeast('8.0') && tg.requestFullscreen) {
+                if (!tg.isFullscreen) {
+                    try { tg.requestFullscreen(); } catch (e) {}
+                }
+            }
         }
     };
 
