@@ -40,9 +40,6 @@ const CANVAS_H = 600;
 const NODE_RADIUS = 22;
 const CELL_SIZE = 90;
 
-// === НОВОЕ: ПОРОГ РАСШИРЕНИЯ ===
-// Когда игрок находится в рядах, ближе чем этот порог к максимальному
-// сгенерированному ряду, карта расширяется автоматически.
 const EXTEND_THRESHOLD = 3;
 
 let cameraX = 0;
@@ -101,10 +98,6 @@ function openAllAdjacentNodes(node: StarNode) {
     }
 }
 
-// === НОВАЯ ФУНКЦИЯ: ПРОВЕРКА И РАСШИРЕНИЕ КАРТЫ ===
-// Вызывается после каждого завершения узла.
-// Если текущий ряд игрока находится ближе чем EXTEND_THRESHOLD рядов
-// к максимальному сгенерированному ряду — карта расширяется.
 function checkAndExtendMap() {
     if (!mapData || mapData.nodes.length === 0) return;
 
@@ -116,8 +109,6 @@ function checkAndExtendMap() {
 
     if (rowsAhead <= EXTEND_THRESHOLD) {
         mapData = extendStarMap(mapData);
-        // После расширения открываем соседей текущего узла,
-        // чтобы новые узлы стали доступны если они рядом.
         openAllAdjacentNodes(currentNode);
     }
 }
@@ -168,7 +159,6 @@ export function loadStarMap(savedMap: StarMapData) {
     const current = mapData.nodes.find(n => n.state === 'current');
     if (current) openAllAdjacentNodes(current);
 
-    // При загрузке сохранения тоже проверяем, не нужно ли расширить карту
     checkAndExtendMap();
 
     resetCameraToCurrent();
@@ -189,7 +179,6 @@ export function completeCurrentNode() {
         previousNodeId = null;
     }
 
-    // ИСПРАВЛЕНО: После завершения узла проверяем, нужно ли расширить карту
     checkAndExtendMap();
 
     resetCameraToCurrent();
@@ -435,10 +424,6 @@ function animateMove(
     requestAnimationFrame(step);
 }
 
-// ============================
-// АВТОБОЙ: ЛОГИКА
-// ============================
-
 function showBattleChoice(node: StarNode) {
     pendingBattleNode = node;
     const overlay = document.getElementById('battle-choice-overlay');
@@ -606,8 +591,6 @@ export {
     hideAutoBattleResult
 };
 
-// ============================
-
 export function showStarMap() {
     canvas = document.getElementById('star-map-canvas') as HTMLCanvasElement;
     if (!canvas) return;
@@ -648,6 +631,66 @@ export function showStarMap() {
     showScreen('star-map-screen');
 }
 
+// === ВЫНОСИМ ЛОГИКУ КЛИКА В ОТДЕЛЬНУЮ ФУНКЦИЮ ===
+function handleNodeClick(pos: {x: number, y: number}) {
+    if (!mapData) return;
+    
+    const worldX = pos.x - cameraX - CANVAS_W / 2;
+    const worldY = pos.y - cameraY - CANVAS_H / 2;
+
+    const clickedNode = mapData.nodes.find(node => {
+        const dx = worldX - node.x;
+        const dy = worldY - node.y;
+        return Math.sqrt(dx * dx + dy * dy) <= NODE_RADIUS + 8;
+    });
+
+    if (!clickedNode) return;
+
+    const current = mapData.nodes.find(n => n.state === 'current');
+    if (!current || current.id === clickedNode.id) return;
+    if (clickedNode.state === 'locked') return;
+
+    if (!clickedNode.completed) {
+        previousNodeId = current.id;
+        current.completed = true;
+        current.state = 'available';
+        clickedNode.state = 'current';
+
+        const nodeTier = getNodeFloor(clickedNode.row) - 1;
+        const battleTier = Math.max(getBossesDefeated(), nodeTier);
+        setCombatTier(battleTier);
+
+        animateMove(
+            { x: current.x, y: current.y },
+            { x: clickedNode.x, y: clickedNode.y },
+            () => {
+                if (clickedNode.type === 'boss') {
+                    setLevel(clickedNode.levelIndex);
+                    setBossLevel(true);
+                    startLevel();
+                    resetCameraToCurrent();
+                } else {
+                    showBattleChoice(clickedNode);
+                }
+            }
+        );
+    } else if (clickedNode.completed) {
+        previousNodeId = null;
+        current.completed = true;
+        current.state = 'available';
+        clickedNode.state = 'current';
+
+        animateMove(
+            { x: current.x, y: current.y },
+            { x: clickedNode.x, y: clickedNode.y },
+            () => {
+                openAllAdjacentNodes(clickedNode);
+                resetCameraToCurrent();
+            }
+        );
+    }
+}
+
 export function initStarMapEvents() {
     canvas = document.getElementById('star-map-canvas') as HTMLCanvasElement;
     if (!canvas) return;
@@ -659,6 +702,8 @@ export function initStarMapEvents() {
             y: (e.clientY - rect.top) * (CANVAS_H / rect.height),
         };
     };
+
+    let isTap = false; // Флаг для определения тапа на мобильных
 
     canvas.addEventListener('mousedown', (e) => {
         isDragging = true;
@@ -691,9 +736,10 @@ export function initStarMapEvents() {
     });
 
     canvas.addEventListener('touchstart', (e) => {
-        e.preventDefault();
+        e.preventDefault(); // Блокирует стандартный click
         const touch = e.touches[0];
         isDragging = true;
+        isTap = true; // Изначально считаем, что это тап
         dragStartX = touch.clientX;
         dragStartY = touch.clientY;
         dragCamStartX = cameraX;
@@ -706,6 +752,12 @@ export function initStarMapEvents() {
         const touch = e.touches[0];
         const dx = touch.clientX - dragStartX;
         const dy = touch.clientY - dragStartY;
+        
+        // Если палец сдвинулся больше чем на 5 пикселей, это свайп, а не тап
+        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+            isTap = false;
+        }
+
         targetCameraX = dragCamStartX + dx;
         targetCameraY = dragCamStartY + dy;
         cameraX = targetCameraX;
@@ -714,6 +766,14 @@ export function initStarMapEvents() {
 
     canvas.addEventListener('touchend', (e) => {
         isDragging = false;
+        
+        // === РУЧНАЯ ОБРАБОТКА ТАПА ДЛЯ МОБИЛЬНЫХ ===
+        if (isTap && mapData && canvas) {
+            const touch = e.changedTouches[0];
+            const pos = getClickPos(touch);
+            handleNodeClick(pos);
+        }
+
         if (mapData) {
             const cur = mapData.nodes.find(n => n.state === 'current');
             if (cur) {
@@ -734,61 +794,6 @@ export function initStarMapEvents() {
         }
 
         const pos = getClickPos(e);
-        const worldX = pos.x - cameraX - CANVAS_W / 2;
-        const worldY = pos.y - cameraY - CANVAS_H / 2;
-
-        const clickedNode = mapData.nodes.find(node => {
-            const dx = worldX - node.x;
-            const dy = worldY - node.y;
-            return Math.sqrt(dx * dx + dy * dy) <= NODE_RADIUS + 8;
-        });
-
-        if (!clickedNode) return;
-
-        const current = mapData.nodes.find(n => n.state === 'current');
-        if (!current || current.id === clickedNode.id) return;
-        if (clickedNode.state === 'locked') return;
-
-        if (!clickedNode.completed) {
-            // Новый уровень: бой.
-            previousNodeId = current.id;
-            current.completed = true;
-            current.state = 'available';
-            clickedNode.state = 'current';
-
-            const nodeTier = getNodeFloor(clickedNode.row) - 1;
-            const battleTier = Math.max(getBossesDefeated(), nodeTier);
-            setCombatTier(battleTier);
-
-            animateMove(
-                { x: current.x, y: current.y },
-                { x: clickedNode.x, y: clickedNode.y },
-                () => {
-                    if (clickedNode.type === 'boss') {
-                        setLevel(clickedNode.levelIndex);
-                        setBossLevel(true);
-                        startLevel();
-                        resetCameraToCurrent();
-                    } else {
-                        showBattleChoice(clickedNode);
-                    }
-                }
-            );
-        } else if (clickedNode.completed) {
-            // Перемещение по уже пройденному узлу без боя.
-            previousNodeId = null;
-            current.completed = true;
-            current.state = 'available';
-            clickedNode.state = 'current';
-
-            animateMove(
-                { x: current.x, y: current.y },
-                { x: clickedNode.x, y: clickedNode.y },
-                () => {
-                    openAllAdjacentNodes(clickedNode);
-                    resetCameraToCurrent();
-                }
-            );
-        }
+        handleNodeClick(pos);
     });
 }

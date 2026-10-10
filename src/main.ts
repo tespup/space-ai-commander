@@ -61,6 +61,18 @@ async function bootstrap() {
     if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
         Telegram.WebApp.ready();
         Telegram.WebApp.expand();
+        
+        // === ИСТИННЫЙ ПОЛНОЭКРАННЫЙ РЕЖИМ TELEGRAM ===
+        try {
+            if (Telegram.WebApp.requestFullscreen) {
+                Telegram.WebApp.requestFullscreen();
+            }
+            if (Telegram.WebApp.disableVerticalSwipes) {
+                Telegram.WebApp.disableVerticalSwipes();
+            }
+        } catch (e) {
+            console.warn('Fullscreen API not supported in this Telegram version', e);
+        }
     }
 
     showScreen('loader-screen');
@@ -82,7 +94,7 @@ async function bootstrap() {
         addComponent(world, player, Health);
 
         Attributes.credits[player] = 0;
-        Attributes.speed[player] = 0.5;
+        Attributes.speed[player] = 0.35; // Увеличена базовая скорость корабля
         Attributes.armor[player] = 0;
         Attributes.weapons[player] = 0;
         Health.max[player] = 150;
@@ -244,7 +256,6 @@ async function bootstrap() {
         volSfx.oninput = () => setSfxVolume(parseFloat(volSfx.value));
     }
 
-    // === Пауза ===
     bind('btn-pause-menu', () => {
         setGamePaused(true);
         const pauseScreen = document.getElementById('pause-screen');
@@ -264,7 +275,6 @@ async function bootstrap() {
         exitToMenu();
     });
 
-    // === Способности ===
     bind('btn-ab-armor', () => useAbility('armor'));
     bind('btn-ab-shield', () => useAbility('shield'));
     bind('btn-ab-pierce', () => useAbility('pierce'));
@@ -272,7 +282,6 @@ async function bootstrap() {
     bind('btn-ab-ram', () => useAbility('ram'));
     bind('btn-ab-rockets', () => useAbility('rockets'));
 
-    // === АВТОБОЙ ===
     bind('btn-battle-standard', () => {
         startStandardBattle();
     });

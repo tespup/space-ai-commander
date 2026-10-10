@@ -90,7 +90,8 @@ export function enemyMovementSystem(app: PIXI.Application) {
         if (type === 0) {
             Enemy.speedTimer[eid] -= time.ms;
             if (Enemy.speedTimer[eid] <= 0) {
-                Enemy.targetSpeed[eid] = 1 + Math.random() * 5;
+                // Увеличили лимиты скорости для врагов меняющих скорость
+                Enemy.targetSpeed[eid] = 3 + Math.random() * 6; 
                 Enemy.speedTimer[eid] = 500 + Math.random() * 1500;
             }
             Velocity.y[eid] += (Enemy.targetSpeed[eid] - Velocity.y[eid]) * lerpPerFrame(0.05, time.f);
@@ -112,14 +113,16 @@ export function enemyMovementSystem(app: PIXI.Application) {
             const targetDy = py - Position.y[eid];
             const dist = Math.hypot(targetDx, targetDy);
             if (dist > 0) {
-                const accel = 0.05;
+                // Увеличили ускорение преследователя в 3 раза
+                const accel = 0.15; 
                 Velocity.x[eid] += (targetDx / dist) * accel * time.f;
                 Velocity.y[eid] += (targetDy / dist) * accel * time.f;
             }
             const damp = dampPerFrame(0.98, time.f);
             Velocity.x[eid] *= damp;
             Velocity.y[eid] *= damp;
-            if (Velocity.y[eid] < 1.5) Velocity.y[eid] = 1.5;
+            // Увеличили минимальную скорость движения вниз, чтобы он не зависал
+            if (Velocity.y[eid] < 3.0) Velocity.y[eid] = 3.0; 
             dx = Velocity.x[eid];
             dy = Velocity.y[eid];
             Position.x[eid] += dx * time.f;
