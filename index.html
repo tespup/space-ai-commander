@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <title>Space AI Commander</title>
@@ -58,8 +57,8 @@
 </div>
 <div id="game-hud" class="hidden">
 <!-- ИСПРАВЛЕНИЕ: кнопка паузы опущена на 1 см (38px) ниже, дизайн изменён
-     в CSS (#btn-pause-menu). Символ-эмодзи заменён на SVG, чтобы цвет
-     управлялся через currentColor и не зависел от emoji-фона системы. -->
+в CSS (#btn-pause-menu). Символ-эмодзи заменён на SVG, чтобы цвет
+управлялся через currentColor и не зависел от emoji-фона системы. -->
 <button id="btn-pause-menu">
 <svg viewBox="0 0 40 40" width="18" height="18" aria-hidden="true" style="pointer-events: none;">
 <rect x="11" y="8" width="7" height="24" rx="2" fill="currentColor"/>
@@ -67,8 +66,8 @@
 </svg>
 </button>
 <!-- ИСПРАВЛЕНИЕ: кредиты и жизни перенесены вниз, одной строкой над
-     полоской HP, без рамки. Старые id in-game-score / in-game-lives
-     сохранены на элементах, чтобы не сломать возможные внешние ссылки. -->
+полоской HP, без рамки. Старые id in-game-score / in-game-lives
+сохранены на элементах, чтобы не сломать возможные внешние ссылки. -->
 <div class="hud-bottom-row">
 <span id="in-game-score" class="hud-credits">💰 <span id="hud-score">0</span></span>
 <span id="in-game-lives" class="hud-lives">❤️ <span id="hud-lives">5</span></span>
@@ -237,6 +236,6 @@
 </div>
 </div>
 </div>
-<script type="module" src="/src/main.ts"></script>
+<script type="module" src="/src/main.ts?v=2"></script>
 </body>
 </html>
