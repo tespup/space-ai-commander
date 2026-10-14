@@ -75,7 +75,12 @@ function sendTgEvent(eventType: string, eventData?: any) {
     } catch (e) {}
 }
 
-// Принудительная портретная ориентация для мобильных устройств
+// 1. Инициализация WebApp напрямую через мост
+sendTgEvent('web_app_ready', null);
+sendTgEvent('web_app_expand', null);
+sendTgEvent('web_app_setup_swipe_behavior', { allow_vertical_swipe: false });
+
+// 2. Умная блокировка вертикального режима
 function enforcePortrait() {
     if (!isMobile) return;
 
@@ -86,17 +91,39 @@ function enforcePortrait() {
 
     const isPortrait = window.innerHeight > window.innerWidth;
 
-    // Если экран вертикальный — блокируем ориентацию в клиенте Telegram.
-    // Если экран горизонтальный — снимаем блокировку, чтобы пользователь мог повернуть телефон.
-    sendTgEvent('web_app_toggle_orientation_lock', { locked: isPortrait });
+    if (isPortrait) {
+        // Экран уже вертикальный — намертво лочим ориентацию в клиенте Telegram
+        sendTgEvent('web_app_toggle_orientation_lock', { locked: true });
+    } else {
+        // Экран пока горизонтальный — разблокируем поворот, чтобы пользователь мог вернуть телефон вертикально
+        sendTgEvent('web_app_toggle_orientation_lock', { locked: false });
+    }
 }
 
-// Запрос полноэкранного режима и фиксация портретной ориентации
-function requestAppFullscreen() {
+// Отслеживаем поворот устройства
+window.addEventListener('resize', enforcePortrait);
+window.addEventListener('orientationchange', () => {
+    setTimeout(enforcePortrait, 50);
+    setTimeout(enforcePortrait, 250);
+});
+
+enforcePortrait();
+
+// 3. ЕСЛИ ЭТО ПК — принудительно выключаем сломанный Fullscreen при старте и через 150 мс
+if (!isMobile) {
+    sendTgEvent('web_app_exit_fullscreen', null);
+
+    setTimeout(() => {
+        sendTgEvent('web_app_exit_fullscreen', null);
+    }, 150);
+}
+
+// 4. Запрос Fullscreen и фиксации на мобильных
+function requestFS() {
     if (!isMobile) return;
 
-    sendTgEvent('web_app_expand');
-    sendTgEvent('web_app_request_fullscreen');
+    sendTgEvent('web_app_expand', null);
+    sendTgEvent('web_app_request_fullscreen', null);
 
     enforcePortrait();
 
@@ -113,32 +140,21 @@ function requestAppFullscreen() {
     }
 }
 
-// Запуск контроля портретной ориентации до инициализации игры
+// Fullscreen запрашивается при старте и дублируется по первому тапу
 if (isMobile) {
-    enforcePortrait();
-
-    // Дублируем запрос fullscreen/expand при старте и через небольшую задержку
-    requestAppFullscreen();
-    setTimeout(requestAppFullscreen, 200);
-
-    window.addEventListener('resize', enforcePortrait);
-
-    window.addEventListener('orientationchange', () => {
-        setTimeout(enforcePortrait, 50);
-        setTimeout(enforcePortrait, 250);
-    });
-
-    // Fullscreen запрашивается при первом пользовательском взаимодействии
-    const onceFS = () => {
-        requestAppFullscreen();
-
-        document.removeEventListener('touchstart', onceFS);
-        document.removeEventListener('click', onceFS);
-    };
-
-    document.addEventListener('touchstart', onceFS, { once: true, passive: true } as AddEventListenerOptions);
-    document.addEventListener('click', onceFS, { once: true });
+    requestFS();
+    setTimeout(requestFS, 200);
 }
+
+const onceFS = () => {
+    requestFS();
+
+    document.removeEventListener('touchstart', onceFS);
+    document.removeEventListener('click', onceFS);
+};
+
+document.addEventListener('touchstart', onceFS, { once: true, passive: true });
+document.addEventListener('click', onceFS, { once: true });
 
 async function bootstrap() {
     // 1. ЕСЛИ ЭТО ПК — безусловно и сразу выкидываем окно из кривого Fullscreen
@@ -193,11 +209,6 @@ async function bootstrap() {
         tg.onEvent('viewportChanged', onResize);
         tg.onEvent('safeAreaChanged', onResize);
         tg.onEvent('contentSafeAreaChanged', onResize);
-
-        // Дополнительная страховка, если клиент отдаёт событие смены ориентации
-        try {
-            tg.onEvent('orientationChanged', onResize);
-        } catch (e) {}
     }
 
     // 3. Дополнительно слушаем стандартный ресайз окна браузера (важно для ПК!)
@@ -281,11 +292,8 @@ async function bootstrap() {
         showScreen('main-menu');
     }
 
-    // Функция запроса полного экрана.
-    // Вызывается по клику пользователя и только на мобильных устройствах.
-    const requestFS = () => {
-        requestAppFullscreen();
-    };
+    // Функция запроса полного экрана объявлена выше:
+    // она вызывается только по клику пользователя и только на мобильных устройствах.
 
     document.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
@@ -298,4 +306,164 @@ async function bootstrap() {
             if (button.id === 'btn-new-game' || button.id === 'btn-start') {
                 playStartButtonSound();
             } else {
-               
+                playRandomButtonSound();
+            }
+        }
+    });
+
+    const bind = (id: string, callback: () => void) => {
+        const el = document.getElementById(id);
+        if (el) el.onclick = callback;
+    };
+
+    bind('btn-new-game', () => {
+        requestFS();
+        window.dispatchEvent(new Event('ship-select-opened'));
+        showScreen('ship-select-screen');
+    });
+
+    bind('btn-start', () => {
+        requestFS();
+        handleContinueGame();
+    });
+
+    bind('btn-next-level', () => {
+        requestFS();
+        setBossLevel(false);
+        startLevel();
+    });
+
+    bind('btn-level-exit', exitToMenu);
+    bind('btn-level-save', handleSaveGame);
+
+    bind('btn-load-menu', () => {
+        requestFS();
+        setSelectedSaveId(null);
+        loadSavesList();
+        showScreen('load-screen');
+    });
+
+    bind('btn-load-back', () => showScreen('main-menu'));
+    bind('btn-load-confirm', handleLoadGame);
+
+    bind('btn-load-delete', () => {
+        handleDeleteSave(false);
+    });
+
+    bind('btn-settings', () => showScreen('settings-screen'));
+    bind('btn-settings-back', () => showScreen('main-menu'));
+
+    bind('btn-exit', () => {
+        const exitScreen = document.getElementById('exit-confirm-screen');
+        if (exitScreen) exitScreen.classList.remove('hidden');
+    });
+
+    bind('btn-exit-no', () => {
+        const exitScreen = document.getElementById('exit-confirm-screen');
+        if (exitScreen) exitScreen.classList.add('hidden');
+    });
+
+    bind('btn-exit-yes', () => {
+        window.close();
+    });
+
+    bind('btn-map-hangar', () => {
+        requestFS();
+        showHangarFromMap();
+    });
+
+    bind('btn-map-save', handleSaveGame);
+    bind('btn-map-menu', exitToMenu);
+
+    bind('btn-gameover-menu', () => {
+        showScreen('main-menu');
+    });
+
+    bind('btn-hangar-back', () => {
+        const title = document.getElementById('level-complete-title');
+        if (title) {
+            title.style.display = 'flex';
+            title.innerHTML = `
+                <span style="font-size: 0.6em;">УРОВЕНЬ</span>
+                <span id="level-complete-num" style="font-size: 1.5em; color: #fff;">1</span>
+                <span style="font-size: 0.6em;">ПРОЙДЕН</span>
+            `;
+        }
+
+        const img = document.getElementById('level-complete-img');
+        if (img) img.style.display = 'block';
+
+        const buttonsDiv = document.getElementById('level-complete-buttons');
+        if (buttonsDiv) {
+            buttonsDiv.style.display = 'flex';
+
+            const btnSave = document.getElementById('btn-level-save');
+            const btnNext = document.getElementById('btn-next-level');
+            const btnExit = document.getElementById('btn-level-exit');
+
+            if (btnSave) btnSave.style.display = 'inline-block';
+            if (btnNext) btnNext.style.display = 'inline-block';
+            if (btnExit) btnExit.style.display = 'inline-block';
+        }
+
+        const backBtn = document.getElementById('btn-hangar-back');
+        if (backBtn) backBtn.style.display = 'none';
+
+        showStarMap();
+    });
+
+    const volMusic = document.getElementById('vol-music') as HTMLInputElement;
+    if (volMusic) {
+        volMusic.oninput = () => setMusicVolume(parseFloat(volMusic.value));
+    }
+
+    const volSfx = document.getElementById('vol-sfx') as HTMLInputElement;
+    if (volSfx) {
+        volSfx.oninput = () => setSfxVolume(parseFloat(volSfx.value));
+    }
+
+    bind('btn-pause-menu', () => {
+        setGamePaused(true);
+
+        const pauseScreen = document.getElementById('pause-screen');
+        if (pauseScreen) pauseScreen.classList.remove('hidden');
+    });
+
+    bind('btn-pause-resume', () => {
+        setGamePaused(false);
+
+        const pauseScreen = document.getElementById('pause-screen');
+        if (pauseScreen) pauseScreen.classList.add('hidden');
+    });
+
+    bind('btn-pause-exit', () => {
+        setGamePaused(false);
+
+        const pauseScreen = document.getElementById('pause-screen');
+        if (pauseScreen) pauseScreen.classList.add('hidden');
+
+        exitToMenu();
+    });
+
+    bind('btn-ab-armor', () => useAbility('armor'));
+    bind('btn-ab-shield', () => useAbility('shield'));
+    bind('btn-ab-pierce', () => useAbility('pierce'));
+    bind('btn-ab-rapid', () => useAbility('rapid'));
+    bind('btn-ab-ram', () => useAbility('ram'));
+    bind('btn-ab-rockets', () => useAbility('rockets'));
+
+    bind('btn-battle-standard', () => {
+        requestFS();
+        startStandardBattle();
+    });
+
+    bind('btn-battle-auto', () => {
+        resolveAutoBattle();
+    });
+
+    bind('btn-auto-battle-continue', () => {
+        hideAutoBattleResult();
+    });
+}
+
+bootstrap();
