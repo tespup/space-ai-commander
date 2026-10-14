@@ -57,26 +57,39 @@ import {
 
 declare const Telegram: any;
 
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+// Функция прямой отправки команд в клиент Telegram (работает без внешних библиотек)
+function sendTgEvent(eventType: string, eventData: any) {
+    const dataStr = eventData ? JSON.stringify(eventData) : '';
+    try {
+        if (window.TelegramWebviewProxy && window.TelegramWebviewProxy.postEvent) {
+            window.TelegramWebviewProxy.postEvent(eventType, dataStr);
+        } else if (window.external && window.external.invoke) {
+            window.external.invoke(JSON.stringify({ eventType: eventType, eventData: eventData }));
+        } else if (window.parent !== window) {
+            window.parent.postMessage(JSON.stringify({ eventType: eventType, eventData: eventData }), '*');
+        }
+    } catch (e) {}
+}
+
 async function bootstrap() {
     // ИСПРАВЛЕНИЕ: Правильная инициализация Telegram API и обработка ресайза
     if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
         const tg = Telegram.WebApp;
         tg.ready();
         tg.expand();
-        
         try {
             if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
         } catch (e) {
             console.warn('Telegram API error:', e);
         }
-
         const onResize = () => {
             const container = document.getElementById('app');
             if (container) {
                 app.renderer.resize(container.clientWidth, container.clientHeight);
             }
         };
-
         tg.onEvent('fullscreenFailed', (e: any) => console.warn('fullscreen failed', e?.error));
         tg.onEvent('fullscreenChanged', onResize);
         tg.onEvent('viewportChanged', onResize);
@@ -84,16 +97,24 @@ async function bootstrap() {
         tg.onEvent('contentSafeAreaChanged', onResize);
     }
 
-    showScreen('loader-screen');
+    // ЕСЛИ ЭТО ПК — принудительно выключаем сломанный Fullscreen при старте и через 150 мс
+    if (!isMobile && typeof Telegram !== 'undefined' && Telegram.WebApp) {
+        const tg = Telegram.WebApp;
+        try { if (tg.exitFullscreen) tg.exitFullscreen(); } catch(e) {}
+        sendTgEvent('web_app_exit_fullscreen', null);
+        setTimeout(() => {
+            try { if (tg.exitFullscreen) tg.exitFullscreen(); } catch(e) {}
+            sendTgEvent('web_app_exit_fullscreen', null);
+        }, 150);
+    }
 
+    showScreen('loader-screen');
     try {
         await initRenderer();
         await loadAllAssets();
-
         initShipSelectionUI(playerImageSrc, (difficulty) => {
             initStarMap(difficulty);
         });
-
         const player = addEntity(world);
         addComponent(world, player, Player);
         addComponent(world, player, Attributes);
@@ -101,7 +122,6 @@ async function bootstrap() {
         addComponent(world, player, Position);
         addComponent(world, player, Velocity);
         addComponent(world, player, Health);
-
         Attributes.credits[player] = 0;
         Attributes.speed[player] = 0.8;
         Attributes.armor[player] = 0;
@@ -114,35 +134,29 @@ async function bootstrap() {
         Abilities.rapidTimer[player] = 0;
         Abilities.ramTimer[player] = 0;
         Abilities.rocketsTimer[player] = 0;
-
         Position.x[player] = app.screen.width / 2;
         Position.y[player] = app.screen.height - 100;
         Velocity.x[player] = 0;
         Velocity.y[player] = 0;
-
         initStarfield();
         initShip(player);
         initHangar(player, () => 0);
         initPlayerControl();
         initInputManager();
         initStarMapEvents();
-
         setOnLevelComplete(() => {
             completeCurrentNode();
         });
-
         setOnPlayerDeath(() => {
             resetAfterDeath();
             revertCurrentNode();
             initShip(player);
             showStarMap();
         });
-
         setOnGameOver(() => {
             resetAfterDeath();
             showScreen('game-over-screen');
         });
-
         await startLoader();
         app.stage.sortableChildren = true;
         startGameLoop();
@@ -151,8 +165,9 @@ async function bootstrap() {
         showScreen('main-menu');
     }
 
-    // ИСПРАВЛЕНИЕ: Функция запроса полного экрана. Вызывается ТОЛЬКО по клику пользователя.
+    // ИСПРАВЛЕНИЕ: Функция запроса полного экрана. Вызывается ТОЛЬКО по клику пользователя И ТОЛЬКО НА МОБИЛЬНЫХ.
     const requestFS = () => {
+        if (!isMobile) return; // На ПК никогда не запрашиваем Fullscreen
         if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
             const tg = Telegram.WebApp;
             if (tg.isVersionAtLeast && tg.isVersionAtLeast('8.0') && tg.requestFullscreen) {
@@ -187,64 +202,50 @@ async function bootstrap() {
         window.dispatchEvent(new Event('ship-select-opened'));
         showScreen('ship-select-screen');
     });
-
     bind('btn-start', () => {
         requestFS();
         handleContinueGame();
     });
-
     bind('btn-next-level', () => {
         requestFS();
         setBossLevel(false);
         startLevel();
     });
-
     bind('btn-level-exit', exitToMenu);
     bind('btn-level-save', handleSaveGame);
-
     bind('btn-load-menu', () => {
         requestFS();
         setSelectedSaveId(null);
         loadSavesList();
         showScreen('load-screen');
     });
-
     bind('btn-load-back', () => showScreen('main-menu'));
     bind('btn-load-confirm', handleLoadGame);
-
     bind('btn-load-delete', () => {
         handleDeleteSave(false);
     });
-
     bind('btn-settings', () => showScreen('settings-screen'));
     bind('btn-settings-back', () => showScreen('main-menu'));
-
     bind('btn-exit', () => {
         const exitScreen = document.getElementById('exit-confirm-screen');
         if (exitScreen) exitScreen.classList.remove('hidden');
     });
-
     bind('btn-exit-no', () => {
         const exitScreen = document.getElementById('exit-confirm-screen');
         if (exitScreen) exitScreen.classList.add('hidden');
     });
-
     bind('btn-exit-yes', () => {
         window.close();
     });
-
     bind('btn-map-hangar', () => {
         requestFS();
         showHangarFromMap();
     });
-
     bind('btn-map-save', handleSaveGame);
     bind('btn-map-menu', exitToMenu);
-
     bind('btn-gameover-menu', () => {
         showScreen('main-menu');
     });
-
     bind('btn-hangar-back', () => {
         const title = document.getElementById('level-complete-title');
         if (title) {
@@ -276,7 +277,6 @@ async function bootstrap() {
     if (volMusic) {
         volMusic.oninput = () => setMusicVolume(parseFloat(volMusic.value));
     }
-
     const volSfx = document.getElementById('vol-sfx') as HTMLInputElement;
     if (volSfx) {
         volSfx.oninput = () => setSfxVolume(parseFloat(volSfx.value));
@@ -287,13 +287,11 @@ async function bootstrap() {
         const pauseScreen = document.getElementById('pause-screen');
         if (pauseScreen) pauseScreen.classList.remove('hidden');
     });
-
     bind('btn-pause-resume', () => {
         setGamePaused(false);
         const pauseScreen = document.getElementById('pause-screen');
         if (pauseScreen) pauseScreen.classList.add('hidden');
     });
-
     bind('btn-pause-exit', () => {
         setGamePaused(false);
         const pauseScreen = document.getElementById('pause-screen');
@@ -312,11 +310,9 @@ async function bootstrap() {
         requestFS();
         startStandardBattle();
     });
-
     bind('btn-battle-auto', () => {
         resolveAutoBattle();
     });
-
     bind('btn-auto-battle-continue', () => {
         hideAutoBattleResult();
     });
