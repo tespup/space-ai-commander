@@ -58,6 +58,9 @@ import {
 declare const Telegram: any;
 
 const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+const PORTRAIT_OVERLAY_ID = 'portrait-rotate-overlay';
+
+let lastPortraitState: boolean | null = null;
 
 // Функция прямой отправки команд в клиент Telegram (с (window as any) для TypeScript)
 function sendTgEvent(eventType: string, eventData?: any) {
@@ -75,94 +78,71 @@ function sendTgEvent(eventType: string, eventData?: any) {
     } catch (e) {}
 }
 
-// 1. Инициализация WebApp напрямую через мост
-sendTgEvent('web_app_ready', null);
-sendTgEvent('web_app_expand', null);
-sendTgEvent('web_app_setup_swipe_behavior', { allow_vertical_swipe: false });
-
-// 2. Умная блокировка вертикального режима
-function enforcePortrait() {
-    if (!isMobile) return;
-
-    // Пробуем стандартный браузерный API (срабатывает в Android WebView в режиме Fullscreen)
-    if (screen.orientation && screen.orientation.lock) {
-        screen.orientation.lock('portrait').catch(() => {});
-    }
-
-    const isPortrait = window.innerHeight > window.innerWidth;
-
-    if (isPortrait) {
-        // Экран уже вертикальный — намертво лочим ориентацию в клиенте Telegram
-        sendTgEvent('web_app_toggle_orientation_lock', { locked: true });
-    } else {
-        // Экран пока горизонтальный — разблокируем поворот, чтобы пользователь мог вернуть телефон вертикально
-        sendTgEvent('web_app_toggle_orientation_lock', { locked: false });
-    }
+function isPortraitViewport(): boolean {
+    return window.innerHeight >= window.innerWidth;
 }
 
-// Отслеживаем поворот устройства
-window.addEventListener('resize', enforcePortrait);
-window.addEventListener('orientationchange', () => {
-    setTimeout(enforcePortrait, 50);
-    setTimeout(enforcePortrait, 250);
-});
+/*
+    Инвертированная технология ориентации:
+    игра требует ПОРТРЕТНЫЙ режим.
 
-enforcePortrait();
+    Если телефон находится в ландшафте:
+    - показывается оверлей "поверни телефон вертикально";
+    - ориентация в Telegram разблокируется, чтобы пользователь мог повернуть устройство.
 
-// 3. ЕСЛИ ЭТО ПК — принудительно выключаем сломанный Fullscreen при старте и через 150 мс
-if (!isMobile) {
-    sendTgEvent('web_app_exit_fullscreen', null);
+    Если телефон уже в портрете:
+    - оверлей скрывается;
+    - ориентация фиксируется, чтобы игра случайно не уехала в ландшафт.
+*/
+function enforcePortrait(force = false) {
+    try {
+        document.documentElement.classList.add('orientation-guard-ready');
+    } catch (e) {}
 
-    setTimeout(() => {
-        sendTgEvent('web_app_exit_fullscreen', null);
-    }, 150);
-}
+    if (!isMobile) {
+        return;
+    }
 
-// 4. Запрос Fullscreen и фиксации на мобильных
-function requestFS() {
-    if (!isMobile) return;
+    const overlay = document.getElementById(PORTRAIT_OVERLAY_ID);
+    const portrait = isPortraitViewport();
 
-    sendTgEvent('web_app_expand', null);
-    sendTgEvent('web_app_request_fullscreen', null);
+    if (overlay) {
+        overlay.classList.toggle('visible', !portrait);
+    }
 
-    enforcePortrait();
-
-    if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
-        const tg = Telegram.WebApp;
-
-        if (tg.isVersionAtLeast && tg.isVersionAtLeast('8.0') && tg.requestFullscreen) {
-            if (!tg.isFullscreen) {
-                try {
-                    tg.requestFullscreen();
-                } catch (e) {}
+    if (force || portrait !== lastPortraitState) {
+        try {
+            const orientation = (screen as any).orientation;
+            if (orientation && typeof orientation.lock === 'function') {
+                orientation.lock('portrait').catch(() => {});
             }
+        } catch (e) {}
+
+        if (portrait) {
+            sendTgEvent('web_app_toggle_orientation_lock', { locked: true });
+        } else {
+            sendTgEvent('web_app_toggle_orientation_lock', { locked: false });
         }
+
+        lastPortraitState = portrait;
     }
 }
 
-// Fullscreen запрашивается при старте и дублируется по первому тапу
-if (isMobile) {
-    requestFS();
-    setTimeout(requestFS, 200);
-}
-
-const onceFS = () => {
-    requestFS();
-
-    document.removeEventListener('touchstart', onceFS);
-    document.removeEventListener('click', onceFS);
-};
-
-document.addEventListener('touchstart', onceFS, { once: true, passive: true });
-document.addEventListener('click', onceFS, { once: true });
+enforcePortrait(true);
 
 async function bootstrap() {
+    enforcePortrait(true);
+
+    window.addEventListener('orientationchange', () => {
+        setTimeout(() => enforcePortrait(true), 50);
+        setTimeout(() => enforcePortrait(true), 250);
+    });
+
     // 1. ЕСЛИ ЭТО ПК — безусловно и сразу выкидываем окно из кривого Fullscreen
     // (НЕ проверяем здесь typeof Telegram, так как на ПК без скрипта он undefined!)
     if (!isMobile) {
         sendTgEvent('web_app_ready');
         sendTgEvent('web_app_exit_fullscreen');
-
         setTimeout(() => sendTgEvent('web_app_exit_fullscreen'), 150);
         setTimeout(() => sendTgEvent('web_app_exit_fullscreen'), 500);
     }
@@ -171,32 +151,19 @@ async function bootstrap() {
     if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
         const tg = Telegram.WebApp;
 
-        try {
-            tg.ready();
-        } catch (e) {}
+        try { tg.ready(); } catch (e) {}
+        try { tg.expand(); } catch (e) {}
 
         try {
-            tg.expand();
-        } catch (e) {}
-
-        try {
-            if (tg.disableVerticalSwipes) {
-                tg.disableVerticalSwipes();
-            }
+            if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
         } catch (e) {}
 
         if (!isMobile) {
-            try {
-                if (tg.exitFullscreen) {
-                    tg.exitFullscreen();
-                }
-            } catch (e) {}
-        } else {
-            enforcePortrait();
+            try { if (tg.exitFullscreen) tg.exitFullscreen(); } catch (e) {}
         }
 
         const onResize = () => {
-            enforcePortrait();
+            enforcePortrait(true);
 
             const container = document.getElementById('app');
             if (container && app && app.renderer) {
@@ -213,7 +180,7 @@ async function bootstrap() {
 
     // 3. Дополнительно слушаем стандартный ресайз окна браузера (важно для ПК!)
     window.addEventListener('resize', () => {
-        enforcePortrait();
+        enforcePortrait(false);
 
         const container = document.getElementById('app');
         if (container && app && app.renderer) {
@@ -256,7 +223,6 @@ async function bootstrap() {
 
         Position.x[player] = app.screen.width / 2;
         Position.y[player] = app.screen.height - 100;
-
         Velocity.x[player] = 0;
         Velocity.y[player] = 0;
 
@@ -292,12 +258,32 @@ async function bootstrap() {
         showScreen('main-menu');
     }
 
-    // Функция запроса полного экрана объявлена выше:
-    // она вызывается только по клику пользователя и только на мобильных устройствах.
+    // ИСПРАВЛЕНИЕ: Функция запроса полного экрана.
+    // Вызывается ТОЛЬКО по клику пользователя И ТОЛЬКО НА МОБИЛЬНЫХ.
+    // Дополнительно теперь она проверяет портретную ориентацию.
+    const requestFS = () => {
+        if (!isMobile) return;
+
+        enforcePortrait(true);
+
+        // Если пользователь всё ещё в ландшафте, не пытаемся раскрывать игру на весь экран.
+        if (!isPortraitViewport()) return;
+
+        sendTgEvent('web_app_expand');
+        sendTgEvent('web_app_request_fullscreen');
+
+        if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
+            const tg = Telegram.WebApp;
+            if (tg.isVersionAtLeast && tg.isVersionAtLeast('8.0') && tg.requestFullscreen) {
+                if (!tg.isFullscreen) {
+                    try { tg.requestFullscreen(); } catch (e) {}
+                }
+            }
+        }
+    };
 
     document.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
-
         const button = target.tagName === 'BUTTON'
             ? target
             : target.closest('button');
@@ -424,24 +410,20 @@ async function bootstrap() {
 
     bind('btn-pause-menu', () => {
         setGamePaused(true);
-
         const pauseScreen = document.getElementById('pause-screen');
         if (pauseScreen) pauseScreen.classList.remove('hidden');
     });
 
     bind('btn-pause-resume', () => {
         setGamePaused(false);
-
         const pauseScreen = document.getElementById('pause-screen');
         if (pauseScreen) pauseScreen.classList.add('hidden');
     });
 
     bind('btn-pause-exit', () => {
         setGamePaused(false);
-
         const pauseScreen = document.getElementById('pause-screen');
         if (pauseScreen) pauseScreen.classList.add('hidden');
-
         exitToMenu();
     });
 
