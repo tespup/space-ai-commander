@@ -59,34 +59,47 @@ declare const Telegram: any;
 
 const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-// Функция прямой отправки команд в клиент Telegram (работает без внешних библиотек)
-function sendTgEvent(eventType: string, eventData: any) {
+// Функция прямой отправки команд в клиент Telegram (с (window as any) для TypeScript)
+function sendTgEvent(eventType: string, eventData?: any) {
     const dataStr = eventData ? JSON.stringify(eventData) : '';
+    const w = window as any;
     try {
-        if (window.TelegramWebviewProxy && window.TelegramWebviewProxy.postEvent) {
-            window.TelegramWebviewProxy.postEvent(eventType, dataStr);
-        } else if (window.external && window.external.invoke) {
-            window.external.invoke(JSON.stringify({ eventType: eventType, eventData: eventData }));
+        if (w.TelegramWebviewProxy && w.TelegramWebviewProxy.postEvent) {
+            w.TelegramWebviewProxy.postEvent(eventType, dataStr);
+        } else if (w.external && w.external.invoke) {
+            w.external.invoke(JSON.stringify({ eventType, eventData }));
         } else if (window.parent !== window) {
-            window.parent.postMessage(JSON.stringify({ eventType: eventType, eventData: eventData }), '*');
+            window.parent.postMessage(JSON.stringify({ eventType, eventData }), '*');
         }
     } catch (e) {}
 }
 
 async function bootstrap() {
-    // ИСПРАВЛЕНИЕ: Правильная инициализация Telegram API и обработка ресайза
+    // 1. ЕСЛИ ЭТО ПК — безусловно и сразу выкидываем окно из кривого Fullscreen
+    // (НЕ проверяем здесь typeof Telegram, так как на ПК без скрипта он undefined!)
+    if (!isMobile) {
+        sendTgEvent('web_app_ready');
+        sendTgEvent('web_app_exit_fullscreen');
+        setTimeout(() => sendTgEvent('web_app_exit_fullscreen'), 150);
+        setTimeout(() => sendTgEvent('web_app_exit_fullscreen'), 500);
+    }
+
+    // 2. Если объект Telegram всё же доступен (например, на смартфонах)
     if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
         const tg = Telegram.WebApp;
-        tg.ready();
-        tg.expand();
+        try { tg.ready(); } catch (e) {}
+        try { tg.expand(); } catch (e) {}
         try {
             if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
-        } catch (e) {
-            console.warn('Telegram API error:', e);
+        } catch (e) {}
+
+        if (!isMobile) {
+            try { if (tg.exitFullscreen) tg.exitFullscreen(); } catch (e) {}
         }
+
         const onResize = () => {
             const container = document.getElementById('app');
-            if (container) {
+            if (container && app && app.renderer) {
                 app.renderer.resize(container.clientWidth, container.clientHeight);
             }
         };
@@ -97,16 +110,13 @@ async function bootstrap() {
         tg.onEvent('contentSafeAreaChanged', onResize);
     }
 
-    // ЕСЛИ ЭТО ПК — принудительно выключаем сломанный Fullscreen при старте и через 150 мс
-    if (!isMobile && typeof Telegram !== 'undefined' && Telegram.WebApp) {
-        const tg = Telegram.WebApp;
-        try { if (tg.exitFullscreen) tg.exitFullscreen(); } catch(e) {}
-        sendTgEvent('web_app_exit_fullscreen', null);
-        setTimeout(() => {
-            try { if (tg.exitFullscreen) tg.exitFullscreen(); } catch(e) {}
-            sendTgEvent('web_app_exit_fullscreen', null);
-        }, 150);
-    }
+    // 3. Дополнительно слушаем стандартный ресайз окна браузера (важно для ПК!)
+    window.addEventListener('resize', () => {
+        const container = document.getElementById('app');
+        if (container && app && app.renderer) {
+            app.renderer.resize(container.clientWidth, container.clientHeight);
+        }
+    });
 
     showScreen('loader-screen');
     try {
@@ -168,6 +178,8 @@ async function bootstrap() {
     // ИСПРАВЛЕНИЕ: Функция запроса полного экрана. Вызывается ТОЛЬКО по клику пользователя И ТОЛЬКО НА МОБИЛЬНЫХ.
     const requestFS = () => {
         if (!isMobile) return; // На ПК никогда не запрашиваем Fullscreen
+        sendTgEvent('web_app_expand');
+        sendTgEvent('web_app_request_fullscreen');
         if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
             const tg = Telegram.WebApp;
             if (tg.isVersionAtLeast && tg.isVersionAtLeast('8.0') && tg.requestFullscreen) {
