@@ -45,7 +45,7 @@ export const saluteSounds = Object.values(import.meta.glob('../assets/sounds/sal
 let activeMusicTrack: string | null = null;
 let activeMusicCategory: string | null = null;
 export let musicVolume = 1.0;
-export let sfxVolume = 1.0;
+export let sfxVolume = 0.5;
 let isFading = false;
 let fadeIntervalId: ReturnType<typeof setInterval> | null = null;
 
