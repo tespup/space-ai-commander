@@ -11,6 +11,7 @@ import * as PIXI from 'pixi.js';
 
 const enemySprites = new Map<number, PIXI.Sprite>();
 const enemyShakes = new Map<number, number>();
+const enemyFlashes = new Map<number, number>();
 
 interface DeathGhost {
     sprite: PIXI.Sprite;
@@ -28,13 +29,8 @@ export function addEnemySprite(eid: number, texture: PIXI.Texture, app: PIXI.App
 }
 
 export function flashEnemy(eid: number) {
-    const sprite = enemySprites.get(eid);
-    if (sprite) {
-        sprite.tint = 0xff0000;
-        setTimeout(() => {
-            if (!sprite.destroyed) sprite.tint = 0xffffff;
-        }, 50);
-    }
+    // 3 кадра ≈ прежние 50 мс из setTimeout, но без создания таймера на каждое попадание
+    if (enemySprites.has(eid)) enemyFlashes.set(eid, 3);
 }
 
 export function shakeEnemy(eid: number, intensity: number = 5) {
@@ -83,11 +79,24 @@ export function enemyRenderSystem() {
     }
 
     const enemies = query(world, [Enemy, Position, Velocity]);
+    // Вероятность спавна шлейфа (эквивалент Math.random() > 0.4 при 60 FPS)
+    const trailP = 1 - Math.pow(0.4, time.f);
 
     for (let i = 0; i < enemies.length; i++) {
         const eid = enemies[i];
         const sprite = enemySprites.get(eid);
         if (sprite) {
+            const flash = enemyFlashes.get(eid);
+            if (flash !== undefined) {
+                if (flash > 1) {
+                    enemyFlashes.set(eid, flash - 1);
+                    sprite.tint = 0xff0000;
+                } else {
+                    enemyFlashes.delete(eid);
+                    sprite.tint = 0xffffff;
+                }
+            }
+
             const shake = enemyShakes.get(eid) || 0;
             let ox = 0, oy = 0;
             if (shake > 0) {
@@ -117,8 +126,8 @@ export function enemyRenderSystem() {
                 sprite.alpha = 1;
             }
 
-            // Вероятность спавна шлейфа (эквивалент Math.random() > 0.4 при 60 FPS)
-            if (Math.random() < 1 - Math.pow(0.4, time.f) && !Enemy.isBoss[eid]) {
+            // Вероятность спавна шлейфа (распределение как прежде)
+            if (Math.random() < trailP && !Enemy.isBoss[eid]) {
                 const tailX = sprite.x - Math.cos(sprite.rotation - Math.PI / 2) * 20;
                 const tailY = sprite.y - Math.sin(sprite.rotation - Math.PI / 2) * 20;
                 spawnEnemyTrail(tailX, tailY, Enemy.trailOuter[eid], Enemy.trailInner[eid]);
@@ -134,5 +143,6 @@ export function removeEnemySprite(eid: number, app: PIXI.Application) {
         sprite.destroy();
         enemySprites.delete(eid);
         enemyShakes.delete(eid);
+        enemyFlashes.delete(eid);
     }
 }

@@ -39,6 +39,19 @@ export function removePlayerSprite(eid: number) {
     }
 }
 
+let cachedSkinIndex = -1;
+let skinCheckTime = 0;
+
+// Читаем localStorage не каждый кадр, а раз в 500 мс (смена скина — только из ангара)
+function getSkinIndex(force = false): number {
+    const now = performance.now();
+    if (force || cachedSkinIndex < 0 || now - skinCheckTime > 500) {
+        skinCheckTime = now;
+        cachedSkinIndex = parseInt(localStorage.getItem('space_ai_ship_index') || '0') || 0;
+    }
+    return cachedSkinIndex;
+}
+
 export function initShip(eid: number) {
     const container = new PIXI.Container();
 
@@ -68,7 +81,7 @@ export function initShip(eid: number) {
     rightArcRed.blendMode = 'add';
     armorContainer.addChild(rightArcCyan, rightArcRed);
 
-    const skinIndex = parseInt(localStorage.getItem('space_ai_ship_index') || '0');
+    const skinIndex = getSkinIndex(true);
     const shipSprite = new PIXI.Sprite(cachedTextures[skinIndex]);
     shipSprite.anchor.set(0.5);
     container.addChild(shipSprite);
@@ -99,7 +112,7 @@ export function shipUpdate() {
 
         visuals.base.visible = levelState !== 'MENU';
 
-        const savedIndex = parseInt(localStorage.getItem('space_ai_ship_index') || '0');
+        const savedIndex = getSkinIndex();
         if (visuals.skinIndex !== savedIndex) {
             visuals.skinIndex = savedIndex;
             visuals.ship.texture = cachedTextures[savedIndex];

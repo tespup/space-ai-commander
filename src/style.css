@@ -456,6 +456,9 @@ button:active { background: var(--neon); color: #000; }
     transition: opacity 0.5s ease;
 }
 #menu-bg.active { opacity: 1; }
+/* Не крутить анимацию, когда фон скрыт — экономия кадров на других экранах */
+#menu-bg:not(.active) { animation-play-state: paused; }
+#main-menu.hidden #scanline { animation-play-state: paused; }
 #main-menu { background: transparent !important; overflow: hidden; padding: 0; }
 #menu-ui-wrapper {
     position: relative;

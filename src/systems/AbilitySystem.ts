@@ -91,6 +91,13 @@ export function abilitySystem(deltaMS: number) {
     if (Abilities.rapidTimer[pid] > 0) Abilities.rapidTimer[pid] -= deltaMS;
     // ПРАВКА 1: ramTimer НЕ уменьшается здесь — им управляет MovementSystem
     if (Abilities.rocketsTimer[pid] > 0) Abilities.rocketsTimer[pid] -= deltaMS;
+}
+
+// HUD обновляем один раз за кадр (см. GameLoop), а не на каждый подшаг логики
+export function updateAbilityHud() {
+    const players = query(world, [Player, Attributes, Abilities, Health]);
+    if (players.length === 0) return;
+    const pid = players[0];
 
     const credits = Attributes.credits[pid] || 0;
 
@@ -107,26 +114,30 @@ export function abilitySystem(deltaMS: number) {
     updateAbilityBtn('btn-ab-rockets', 'ab-cnt-rockets', 'ab-cost-rockets', 'ab-timer-rockets',
         credits, 'rockets', Abilities.rocketsTimer[pid]);
 
-    const ramBtn = document.getElementById('btn-ab-ram');
-    if (ramBtn && currentLevelIsBoss) {
-        ramBtn.classList.add('disabled');
-    }
-
     const hudScore = document.getElementById('hud-score');
-    if (hudScore) hudScore.innerText = credits.toString();
+    if (hudScore) hudScore.textContent = credits.toString();
     const levelScore = document.getElementById('level-credit-count');
-    if (levelScore) levelScore.innerText = credits.toString();
+    if (levelScore) levelScore.textContent = credits.toString();
 }
+
+interface BtnUICache {
+    cnt: string; cost: string; timer: string;
+    active: boolean; disabled: boolean;
+}
+const btnCache = new Map<string, BtnUICache>();
 
 function updateAbilityBtn(
     btnId: string, cntId: string, costId: string, timerId: string,
     credits: number, type: keyof typeof BASE_COSTS, timer: number
 ) {
     const btn = document.getElementById(btnId);
-    const cnt = document.getElementById(cntId);
-    const costEl = document.getElementById(costId);
-    const timerEl = document.getElementById(timerId);
     if (!btn) return;
+
+    let cache = btnCache.get(btnId);
+    if (!cache) {
+        cache = { cnt: '', cost: '', timer: '', active: false, disabled: false };
+        btnCache.set(btnId, cache);
+    }
 
     const cost = getAbilityCost(type);
     const count = Math.floor(credits / cost);
@@ -134,25 +145,47 @@ function updateAbilityBtn(
     const isActive = timer > 0;
     const canAfford = credits >= cost;
 
-    if (cnt) cnt.innerText = count.toString();
-    if (costEl) costEl.innerText = cost.toString();
-
-    btn.classList.toggle('active', isActive);
-
-    if (type === 'ram' && currentLevelIsBoss) {
-        btn.classList.add('disabled');
-    } else {
-        btn.classList.toggle('disabled', !isActive && !canAfford);
+    const countStr = count.toString();
+    if (countStr !== cache.cnt) {
+        cache.cnt = countStr;
+        const cnt = document.getElementById(cntId);
+        if (cnt) cnt.textContent = countStr;
+    }
+    const costStr = cost.toString();
+    if (costStr !== cache.cost) {
+        cache.cost = costStr;
+        const costEl = document.getElementById(costId);
+        if (costEl) costEl.textContent = costStr;
     }
 
+    if (isActive !== cache.active) {
+        cache.active = isActive;
+        btn.classList.toggle('active', isActive);
+    }
+
+    let disabled: boolean;
+    if (type === 'ram' && currentLevelIsBoss) disabled = true;
+    else disabled = !isActive && !canAfford;
+    if (disabled !== cache.disabled) {
+        cache.disabled = disabled;
+        if (disabled) btn.classList.add('disabled');
+        else btn.classList.remove('disabled');
+    }
+
+    const timerEl = document.getElementById(timerId);
     if (timerEl) {
+        let timerStr: string;
         if (isActive && duration > 1) {
-            const pct = Math.max(0, Math.min(100, (timer / duration) * 100));
-            timerEl.style.setProperty('--timer-pct', pct + '%');
+            const pct = Math.round(Math.max(0, Math.min(100, (timer / duration) * 100)));
+            timerStr = pct + '%';
         } else if (isActive) {
-            timerEl.style.setProperty('--timer-pct', '100%');
+            timerStr = '100%';
         } else {
-            timerEl.style.setProperty('--timer-pct', '0%');
+            timerStr = '0%';
+        }
+        if (timerStr !== cache.timer) {
+            cache.timer = timerStr;
+            timerEl.style.setProperty('--timer-pct', timerStr);
         }
     }
 }

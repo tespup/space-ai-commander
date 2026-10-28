@@ -65,17 +65,10 @@ export function initShipSelectionUI(playerImageSrc: string, onConfirm: (difficul
         color: #000;
         box-shadow: 0 0 10px #00f2ff;
       }
+      @keyframes ship-scan-move { from { top: 0px; } to { top: 158px; } }
+      #ship-scanner-line { animation: ship-scan-move 2.4s linear infinite; }
     `;
     document.head.appendChild(style);
-
-    let scanPos = 0;
-    setInterval(() => {
-        const line = document.getElementById('ship-scanner-line');
-        if (line) {
-            scanPos = (scanPos + 2) % 160;
-            line.style.top = scanPos + 'px';
-        }
-    }, 30);
 
     const canvas = document.getElementById('ship-preview-canvas') as HTMLCanvasElement;
     const ctx = canvas.getContext('2d');

@@ -11,6 +11,7 @@ import { Player } from './components/Player';
 import { Abilities } from './components/Abilities';
 import { Health } from './components/Health';
 import { initRenderer, app } from './core/Renderer';
+import { initTextureFactory } from './core/Textures';
 import { initStarfield } from './systems/StarfieldSystem';
 import { initShip } from './systems/ShipSystem';
 import { initHangar, showHangarFromMap } from './ui/HangarManager';
@@ -192,6 +193,7 @@ async function bootstrap() {
 
     try {
         await initRenderer();
+        initTextureFactory(app);
         await loadAllAssets();
 
         initShipSelectionUI(playerImageSrc, (difficulty) => {

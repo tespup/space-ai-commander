@@ -4,6 +4,7 @@ import { app } from '../core/Renderer';
 import { playBoomSound } from '../core/AssetLoader';
 import { time } from '../core/GameTime';
 import { dampPerFrame } from '../core/TimeUtils';
+import { texCircle8, texCircle8Alpha, texCircle32, texShard, texBar, texPair, acquire, release } from '../core/Textures';
 
 interface Particle {
     gfx: PIXI.Container; 
@@ -16,10 +17,22 @@ interface Particle {
 
 const particles: Particle[] = [];
 
+const FLOAT_TEXT_STYLE = new PIXI.TextStyle({ fill: 0xffffff, fontSize: 18, fontWeight: 'bold' });
+
+function despawn(p: Particle) {
+    if (p.gfx instanceof PIXI.Sprite) release(p.gfx);
+    else {
+        app.stage.removeChild(p.gfx);
+        p.gfx.destroy();
+    }
+}
+
 export function spawnThrusterFire(x: number, y: number) {
     const colors = [0xffaa00, 0xff5500, 0xff2200];
     const color = colors[Math.floor(Math.random() * colors.length)];
-    const fire = new PIXI.Graphics().circle(0, 0, 2 + Math.random() * 2).fill(color);
+    const fire = acquire(texCircle8(), 'circle8');
+    fire.tint = color;
+    fire.scale.set((2 + Math.random() * 2) / 8);
     fire.x = x + (Math.random() * 2 - 1);
     fire.y = y;
     app.stage.addChildAt(fire, 0);
@@ -28,7 +41,8 @@ export function spawnThrusterFire(x: number, y: number) {
 
 export function spawnWingTrail(x: number, y: number) {
     const length = 10 + Math.random() * 8;
-    const trail = new PIXI.Graphics().rect(-0.5, 0, 1, length).fill({ color: 0xffffff, alpha: 0.5 });
+    const trail = acquire(texBar(), 'bar', 0);
+    trail.scale.set(1, length / 16);
     trail.x = x;
     trail.y = y;
     app.stage.addChildAt(trail, 0);
@@ -37,10 +51,8 @@ export function spawnWingTrail(x: number, y: number) {
 
 export function spawnEnemyTrail(x: number, y: number, outerColor: number, innerColor: number) {
     const radius = 4 + Math.random() * 3;
-    const trail = new PIXI.Graphics();
-    
-    trail.circle(0, 0, radius).fill({ color: outerColor, alpha: 0.8 });
-    trail.circle(0, 0, radius * 0.4).fill({ color: innerColor, alpha: 1.0 });
+    const trail = acquire(texPair(outerColor, innerColor), `et-${outerColor}-${innerColor}`);
+    trail.scale.set(radius / 10);
 
     trail.x = x + (Math.random() * 8 - 4);
     trail.y = y + (Math.random() * 8 - 4);
@@ -52,7 +64,9 @@ export function spawnEnemyTrail(x: number, y: number, outerColor: number, innerC
 }
 
 export function spawnFloatingText(text: string, x: number, y: number, color: number) {
-    const txt = new PIXI.Text({ text, style: { fill: color, fontSize: 18, fontWeight: 'bold' } });
+    const style = FLOAT_TEXT_STYLE.clone();
+    style.fill = color;
+    const txt = new PIXI.Text({ text, style });
     txt.x = x;
     txt.y = y;
     txt.anchor.set(0.5);
@@ -61,7 +75,8 @@ export function spawnFloatingText(text: string, x: number, y: number, color: num
 }
 
 export function spawnMuzzleFlash(x: number, y: number) {
-    const flash = new PIXI.Graphics().circle(0, 0, 8).fill(0xffffbb);
+    const flash = acquire(texCircle8(), 'circle8');
+    flash.tint = 0xffffbb;
     flash.x = x;
     flash.y = y;
     app.stage.addChild(flash);
@@ -70,7 +85,9 @@ export function spawnMuzzleFlash(x: number, y: number) {
 
 export function spawnHitImpact(x: number, y: number) {
     for (let i = 0; i < 5; i++) {
-        const gfx = new PIXI.Graphics().circle(0, 0, 2).fill(0xffaa00);
+        const gfx = acquire(texCircle8(), 'circle8');
+        gfx.tint = 0xffaa00;
+        gfx.scale.set(2 / 8);
         gfx.x = x;
         gfx.y = y;
         app.stage.addChild(gfx);
@@ -83,14 +100,18 @@ export function spawnHitImpact(x: number, y: number) {
 export function spawnExplosion(x: number, y: number, scaleMult: number = 1, rotation: number = 0) {
     playBoomSound();
     
-    const blast = new PIXI.Graphics().circle(0, 0, 15 * scaleMult).fill(0xff5500);
+    const blast = acquire(texCircle32(), 'circle32');
+    blast.tint = 0xff5500;
+    blast.scale.set((15 * scaleMult) / 32);
     blast.x = x; 
     blast.y = y;
     app.stage.addChild(blast);
     particles.push({ gfx: blast, vx: 0, vy: 0, life: 333, scaleSpeed: 1.1, alphaSpeed: 0.05 });
 
     for(let j = 0; j < 2; j++) {
-        const miniBlast = new PIXI.Graphics().circle(0, 0, 8 * scaleMult).fill(0xffaa00);
+        const miniBlast = acquire(texCircle32(), 'circle32');
+        miniBlast.tint = 0xffaa00;
+        miniBlast.scale.set((8 * scaleMult) / 32);
         miniBlast.x = x + (Math.random() * 20 - 10) * scaleMult;
         miniBlast.y = y + (Math.random() * 20 - 10) * scaleMult;
         app.stage.addChild(miniBlast);
@@ -98,7 +119,8 @@ export function spawnExplosion(x: number, y: number, scaleMult: number = 1, rota
     }
 
     for (let i = 0; i < 8; i++) {
-        const gfx = new PIXI.Graphics().poly([-3,-3, 3,-3, 0,4]).fill(0xffaa00);
+        const gfx = acquire(texShard(), 'shard');
+        gfx.tint = 0xffaa00;
         gfx.rotation = rotation + Math.random() * Math.PI; 
         gfx.scale.set(scaleMult);
         gfx.x = x; 
@@ -116,7 +138,9 @@ export function spawnFirework(x: number, y: number) {
     const color = colors[Math.floor(Math.random() * colors.length)];
     
     for (let i = 0; i < 80; i++) {
-        const gfx = new PIXI.Graphics().circle(0, 0, 3 + Math.random() * 3).fill(color);
+        const gfx = acquire(texCircle8(), 'circle8');
+        gfx.tint = color;
+        gfx.scale.set((3 + Math.random() * 3) / 8);
         gfx.x = x;
         gfx.y = y;
         gfx.blendMode = 'add'; 
@@ -132,7 +156,9 @@ export function spawnMenuDust() {
     const x = Math.random() * app.screen.width;
     const y = app.screen.height + 20;
     const size = 0.5 + Math.random() * 1.5;
-    const dust = new PIXI.Graphics().circle(0, 0, size).fill({ color: 0x00f2ff, alpha: 0.4 });
+    const dust = acquire(texCircle8Alpha(0.4), 'circle8a0.4');
+    dust.tint = 0x00f2ff;
+    dust.scale.set(size / 8);
     dust.x = x;
     dust.y = y;
     dust.zIndex = 5; 
@@ -151,8 +177,7 @@ export function updateVFX() {
         p.life -= time.ms;
 
         if (p.life <= 0 || p.gfx.alpha <= 0) {
-            app.stage.removeChild(p.gfx);
-            p.gfx.destroy();
+            despawn(p);
             particles.splice(i, 1);
         }
     }

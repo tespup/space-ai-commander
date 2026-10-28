@@ -16,6 +16,7 @@ import { playPlayerShootSound, playPlayerShootDopSound } from '../core/AssetLoad
 import { getActiveEnemies } from './EnemySpawnSystem';
 import { time } from '../core/GameTime';
 import { dampPerFrame, lerpPerFrame } from '../core/TimeUtils';
+import { texCircle8Alpha, texGhost, acquire, release } from '../core/Textures';
 import * as PIXI from 'pixi.js';
 
 let shootCooldown = 0;
@@ -140,7 +141,7 @@ function ensureTextures(app: PIXI.Application) {
 }
 
 interface TrailParticle {
-    gfx: PIXI.Graphics;
+    gfx: PIXI.Sprite;
     vx: number; vy: number;
     life: number;
     scaleSpeed: number; alphaSpeed: number;
@@ -150,7 +151,9 @@ const trailParticles: TrailParticle[] = [];
 let trailAcc = 0;
 
 function spawnEnergyTrail(app: PIXI.Application, x: number, y: number) {
-    const c = new PIXI.Graphics().circle(0, 0, 2 + Math.random() * 2).fill({ color: currentTrailColor, alpha: 0.5 });
+    const c = acquire(texCircle8Alpha(0.5), 'circle8a0.5');
+    c.tint = currentTrailColor;
+    c.scale.set((2 + Math.random() * 2) / 8);
     c.x = x + (Math.random() - 0.5) * 3;
     c.y = y;
     app.stage.addChild(c);
@@ -159,7 +162,9 @@ function spawnEnergyTrail(app: PIXI.Application, x: number, y: number) {
 }
 
 function spawnSparkTrail(app: PIXI.Application, x: number, y: number) {
-    const s = new PIXI.Graphics().circle(0, 0, 0.8 + Math.random() * 0.8).fill({ color: currentTrailColor, alpha: 0.8 });
+    const s = acquire(texCircle8Alpha(0.8), 'circle8a0.8');
+    s.tint = currentTrailColor;
+    s.scale.set((0.8 + Math.random() * 0.8) / 8);
     s.x = x;
     s.y = y;
 
@@ -173,7 +178,9 @@ function spawnSparkTrail(app: PIXI.Application, x: number, y: number) {
 
 function spawnGhostTrail(app: PIXI.Application, x: number, y: number) {
     const s = 1.5 + Math.random();
-    const gh = new PIXI.Graphics().poly([0, -s * 2, s, 0, 0, s * 2, -s, 0]).fill({ color: currentTrailColor, alpha: 0.2 });
+    const gh = acquire(texGhost(), 'ghost');
+    gh.tint = currentTrailColor;
+    gh.scale.set(s);
     gh.x = x;
     gh.y = y;
     app.stage.addChild(gh);
@@ -195,8 +202,7 @@ function updateTrails(app: PIXI.Application) {
         p.life -= time.ms;
 
         if (p.life <= 0 || p.gfx.alpha <= 0) {
-            app.stage.removeChild(p.gfx);
-            p.gfx.destroy();
+            release(p.gfx);
             trailParticles.splice(i, 1);
         }
     }

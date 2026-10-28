@@ -1,5 +1,3 @@
-import { defineComponent, eid } from 'bitecs';
-
-export const AIControl = defineComponent({
-  targetId: eid
-});
+export const AIControl = {
+  targetId: [] as number[]
+};

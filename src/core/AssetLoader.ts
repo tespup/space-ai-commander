@@ -221,4 +221,16 @@ export async function loadAllAssets() {
         }
     }
     initBossTextures(bossTextures);
+
+    // Прогреваем HTTP-кэш SFX (не блокируем загрузку экрана) — иначе первый
+    // выстрел/взрыв играется с задержкой на скачивание. Декодирование делает
+    // сам @pixi/sound при первом play (preload:true в v6 ломает повторный load).
+    const allSfx = [
+        ...buttonSounds, ...startButtonSounds, ...playerShootSounds,
+        ...playerShootDopSounds, ...enemyShootSounds, ...bossShootSounds,
+        ...boomSounds, ...bossEnterSounds, ...saluteSounds,
+    ];
+    for (const t of allSfx) {
+        try { fetch(t, { cache: 'force-cache' }).catch(() => {}); } catch (e) {}
+    }
 }

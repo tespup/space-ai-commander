@@ -613,6 +613,12 @@ export function showStarMap() {
             animFrameId = null;
             return;
         }
+        // Экран скрыт — не тратим кадры на перерисовку невидимого canvas
+        const screen = document.getElementById('star-map-screen');
+        if ((screen && screen.classList.contains('hidden')) || document.hidden) {
+            animFrameId = null;
+            return;
+        }
         pulseTime += 16;
         cameraX += (targetCameraX - cameraX) * RETURN_SPEED;
         cameraY += (targetCameraY - cameraY) * RETURN_SPEED;

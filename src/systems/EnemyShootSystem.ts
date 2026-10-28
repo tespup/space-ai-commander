@@ -7,6 +7,7 @@ import { world } from '../core/world';
 import { playEnemyShootSound, playBossShootSound } from '../core/AssetLoader';
 import { time } from '../core/GameTime';
 import * as PIXI from 'pixi.js';
+import { texEnemyBullet, texEnemyBulletBoss, acquire, release } from '../core/Textures';
 
 const enemyBulletSprites = new Map<number, PIXI.Sprite>();
 
@@ -23,21 +24,12 @@ export function spawnEnemyBullet(x: number, y: number, app: PIXI.Application, is
     Velocity.y[bullet] = isBoss ? 10.33 : 10.5; 
     EnemyBullet.isBoss[bullet] = isBoss ? 1 : 0;
 
-    const graphics = new PIXI.Graphics();
-    if (isBoss) {
-        graphics.rect(-2, -10, 4, 20).fill(0xff0000); 
-        playBossShootSound();
-    } else {
-        graphics.circle(0, 0, 4).fill(0xffaa00);
-        playEnemyShootSound();
-    }
-    
-    const texture = app.renderer.generateTexture(graphics);
-    const sprite = new PIXI.Sprite(texture);
-    sprite.anchor.set(0.5);
+    const sprite = acquire(isBoss ? texEnemyBulletBoss() : texEnemyBullet(), isBoss ? 'ebulletBoss' : 'ebullet');
     app.stage.addChild(sprite);
     enemyBulletSprites.set(bullet, sprite);
-    graphics.destroy();
+
+    if (isBoss) playBossShootSound();
+    else playEnemyShootSound();
 }
 
 export function enemyBulletMovementSystem(app: PIXI.Application) {
@@ -70,8 +62,7 @@ export function enemyBulletRenderSystem() {
 export function removeEnemyBulletSprite(eid: number, app: PIXI.Application) {
     const sprite = enemyBulletSprites.get(eid);
     if (sprite) {
-        app.stage.removeChild(sprite);
-        sprite.destroy();
+        release(sprite);
         enemyBulletSprites.delete(eid);
     }
 }
